@@ -1,41 +1,45 @@
 ldtools
-=======
+-------
 
 * A lightweight "ORM" to handle Linked Data Resources and their Origins
 * Written in python
 * Stores everything in memory
 * Dependencies: rdflib
 * API is still very unstable because I need to add more features and don't know yet how this will turn out
-* 90% test coverage to describe how it works
+* 90% test coverage to describe how it works. Most functionality is described in the tests
+* More features following soon.
 
 
 How to use it?
 --------------
 
-    # Most functionality is describes in the tests. I'll try to describe the
-    # basic ideas here soon.
+First, we create a Resource object (this will create an Origin object):
 
     from ldtools import Resource, Origin
-    import rdflib
 
-    # First, we define the Resource object and thereby its Origin object
     uri = "http://dbpedia.org/resource/Karlsruhe"
+
     r, created = Resource.objects.get_or_create(uri, auto_origin=True)
 
-    # Process it, hopefully discovering more Origins in there (rdfs:seeAlso, owl:sameAs...)
-    # process it
-    r._origin.GET(GRAPH_SIZE_LIMIT=25000, follow_uris=[rdflib.RDFS.seeAlso,rdflib.OWL.sameAs], handle_owl_imports=True)
 
-    assert Resource.objects.all() > 1
-    assert Origin.objects.all() > 1
+Process it, hopefully discovering more Origins in there (rdfs:seeAlso, owl:sameAs...)
 
-    # process all the other Origins we found
-    Origin.objects.GET_all()
+    import rdflib
+
+    r._origin.GET(follow_uris=[rdflib.OWL.sameAs])
+
 
     import pprint
+    
     pprint.pprint(r.__dict__)
 
-    print "Crawled %s Origins and collected %s Resources" % (len(list(Origin.objects.filter(processed=True))), len(list(Resource.objects.all())))
+
+Process all the other Origins we know about
+
+    Origin.objects.GET_all()
+
+
+Result: 5 URIs crawled and 500 Resources discovered!
 
 
 Why?
@@ -48,7 +52,7 @@ Why?
 
 
 Contact
-=======
+-------
 You can contact me directly via Twitter @daniel_aus_wa or drop me an email to the address mentioned in setup.py
 
 Please submit ideas and bugs to http://github.com/dmr/ldtools/issues.
