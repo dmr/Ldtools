@@ -4,6 +4,7 @@ __version__ = "0.1"
 __useragent__ = ('ldtools-%s (http://github.com/dmr/ldtools, daniel@nwebs.de)'
                  % __version__)
 
+import os
 import datetime
 import rdflib
 import urllib2
@@ -93,6 +94,7 @@ def hash_to_slash_uri(uri):
     return uri
 
 
+
 class Field(object):
     def to_db(self, value=None):
         if value is None:
@@ -123,10 +125,10 @@ class ObjectField(Field):
 
 
 
-
 class Backend(object):
     """ Abstract Backend to demonstrate API
     """
+    # TODO: "Backend" if it manages one file/resource?
     def GET(self):
         raise NotImplementedError
     def PUT(self):
@@ -135,7 +137,6 @@ class Backend(object):
 
 class RestBackend(Backend):
     def GET(self, uri, origin): # TODO remove origin
-
         """lookup URI"""
         # TODO: friendly crawling: use robots.txt
         # crawling speed limitations in robots.txt.
@@ -208,17 +209,31 @@ class RestBackend(Backend):
         return content
 
 
-class FileBackend(Backend):
-    def __init__(self, filename):
-        import os
+
+class SingleFileBackend(Backend):
+    """Manages one xml file --> Uri that the user wants to "PUT" to is not
+    flexible!
+    """
+    #@staticmethod
+    #def build_filename(uri):
+    #    return uri.lstrip("http://").replace(".","_")\
+    #        .replace("/","__").replace("?","___").replace("&","____")
+    #def get_filename(self, uri):
+    #    fn = FileBackend.build_filename(uri)
+    #    fn = "%s.%s" % (fn, self.format)
+    #    return os.path.join(self.folder, fn)
+
+    def __init__(self, filename, format="xml"):
+        # TODO: filename contains ".xml"
         assert os.path.exists(filename)
         self.filename = filename
+        # TODO: assert format in rdflib.parserplugins
+        self.format = format
 
-    def GET(self):
+    def GET(self, uri, origin):
         with open(self.filename, "r") as f:
             data = f.read()
         return data
-
 
 
 
@@ -570,7 +585,8 @@ class OriginManager(Manager):
         uri = canonalize_uri(uri)
         return super(OriginManager, self).get(pk=uri)
 
-    def get_or_create(self, uri):
+    def get_or_create(self, uri, **kwargs):
+        assert not kwargs, "If you intend to use 'backend' please use .create direktly"
         uri = canonalize_uri(uri)
         assert str(uri) == str(hash_to_slash_uri(uri))
         try:
