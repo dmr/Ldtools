@@ -479,7 +479,6 @@ class OriginManager(Manager):
                 for origin in crawl:
                     origin.GET(**kwargs)
 
-
 class Origin(Model):
 
     uri = URIRefField()
@@ -489,14 +488,21 @@ class Origin(Model):
         if not hasattr(self, 'errors'): self.errors = []
         self.errors.append(error)
 
+    def __init__(self, pk=None, **kwargs):
+        super(Origin, self).__init__(pk=pk, **kwargs)
+        self.stats = {}
+
     def __unicode__(self):
         str = u"%s" % unicode(self.uri)
         if hasattr(self, 'errors'):
             for error in self.errors: str += u" %s" % error
         if hasattr(self, 'processed'):
             str += u" Processed"
-            if hasattr(self, '_stats_process_time'):
-                str += u" (%s)" % self._stats_process_time
+            if hasattr(self, 'stats'):
+                if hasattr(self, 'handle_graph'):
+                    str += u" (%s)" % self.stats['handle_graph']
+                else:
+                    raise NotImplementedError
         return str
 
     def has_unsaved_changes(self):
@@ -518,18 +524,12 @@ class Origin(Model):
         if hasattr(self, "processed") and self.processed:
             logger.info(u"Already crawled: %s" % self.uri)
             return
+        logger.info(u"GET %s..." % self.uri)
 
-        logger.info(u"Crawling %s..." % self.uri)
-
-        #resources_before = len(Resource.objects.all())
-
-        assert not hasattr(self, 'contained_objects')
-        #._storage, self.objects._storage
-
-        self._last_processed = datetime.datetime.now()
+        assert not self.has_unsaved_changes(), ("Please save all changes "
+            "before querying again. Merging not supported yet")
 
         # http://www.infoq.com/news/2008/04/cool-uris-rest
-
         if skip_urls is not None and str(self.uri) in skip_urls:
             self.add_error("Skipped")
             self.processed = True
@@ -577,15 +577,25 @@ class Origin(Model):
             if g_length > GRAPH_SIZE_LIMIT:
                 logger.error("Nope."); return
 
+        # normal rdflib.compare does not work correctly with
+        # conjunctiveGraph, unless there is only one graph within that
+        assert len(list(g.contexts())) == 1
 
-        ### Handle triples
+        def triples_per_second(triples, time):
+            # TODO: should be more accurate
+            td = time
+            total_seconds = (td.microseconds+(td.seconds+\
+                                              td.days*24*3600)*10**6)//10**6
+            if total_seconds > 0:
+                triples_per_second = triples / total_seconds
+                return triples_per_second
+            else: return
 
         def handle_follow_uri(o):
             if isinstance(o, rdflib.Literal):
                 logging.error(u"%s is Literal! Only URIRefs are allowed as "
                               u"follow_uri destination" % o.encode('utf8'))
                 return
-
 
             uri = hash_to_slash_uri(o)
 
@@ -631,10 +641,6 @@ class Origin(Model):
             follow_uris = [rdflib.URIRef(u) if not\
                 isinstance(u, rdflib.URIRef) else u for u in follow_uris]
 
-        # normal rdflib.compare does not work correctly with
-        # conjunctiveGraph, unless there is only one graph within that
-        assert len(list(g.contexts())) == 1
-
         self._original_graph = g
         start_time = datetime.datetime.now()
 
@@ -662,9 +668,10 @@ class Origin(Model):
                     else:
                         handler(item)
 
-        self.processed = True
+        for resource in self.get_resources():
+            resource._has_changes = False
 
-        self._stats_process_time = datetime.datetime.now() - start_time
+        self.stats['handle_graph'] = datetime.datetime.now() - start_time
 
         g1 = self._original_graph
         g2 = self.graph()
@@ -672,15 +679,6 @@ class Origin(Model):
         assert compare.to_isomorphic(g1) == compare.to_isomorphic(g2), \
             my_graph_diff(g1,g2)
 
-        def triples_per_second(triples, time):
-            # TODO: should be more accurate
-            td = time
-            total_seconds = (td.microseconds+(td.seconds+\
-                                              td.days*24*3600)*10**6)//10**6
-            if total_seconds > 0:
-                triples_per_second = triples / total_seconds
-                return triples_per_second
-            else: return
 
         if hasattr(self, '_original_graph'):
             triples = len(self._original_graph)
