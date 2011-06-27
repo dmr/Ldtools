@@ -208,6 +208,31 @@ class RestBackend(Backend):
 
         return content
 
+    def PUT(self, graph, origin):
+        import mimetypes
+        mimetypes.init()
+        content_type = mimetypes.types_map[".rdf"] # 'application/rdf+xml'
+
+        self.format = content_type
+
+        # TODO: maybe 'pretty-xml'?
+        data = graph.serialize(format="xml")
+
+        # TODO: authentication? oauth?
+        #h = httplib2.Http()
+        #h.add_credentials('name', 'password')
+        #resp, content = h.request(uri, "PUT", body=data, headers=headers)
+        #if resp.status != 200: raise Error(resp.status, errmsg, headers)
+        #return resp, content
+        headers={"content-type": content_type,
+                 "User-Agent": __useragent__,
+                 "Content-Length": str(len(data))}
+        opener = urllib2.build_opener(urllib2.HTTPHandler)
+        request = urllib2.Request(origin.uri,
+                                  data=data,
+                                  headers=headers)
+        request.get_method = lambda: 'PUT'
+        response = opener.open(request)
 
 
 class SingleFileBackend(Backend):
@@ -235,6 +260,15 @@ class SingleFileBackend(Backend):
             data = f.read()
         return data
 
+    def PUT(self, data, origin):
+        import mimetypes
+        mimetypes.init()
+        content_type = mimetypes.types_map[".rdf"] # 'application/rdf+xml'
+        # we want to update it --> it must exist first!
+        assert os.path.exists(filename)
+        data = graph.serialize(format=self.format)
+        with open(filename, "w") as f:
+            f.write(data)
 
 
 
@@ -841,6 +875,15 @@ class Origin(Model):
 
         self.handled = True
 
+
+    def PUT(self):
+        assert hasattr(self, "_graph")
+        if not self.has_unsaved_changes():
+            logging.error("Nothing to PUT for %s!" % self.uri)
+            return
+        g = self.graph()
+        self.backend.PUT(graph=g, origin=self)
+        # TODO return?
 
 
     def graph(self):
