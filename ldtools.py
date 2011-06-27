@@ -763,9 +763,16 @@ class Origin(Model):
         creates rdflib.ConjunctiveGraph because rdflib.Graph does not allow
         parsing plugins
         """
-        assert hasattr(self, '_graph')
-
+        # TODO: rdflib.graph() ?
         g = rdflib.graph.ConjunctiveGraph(identifier=self.uri)
+
+        if not hasattr(self, '_graph'):
+            if len(self.errors) == 0:
+                self.GET() # TODO: test for recursion?
+            else:
+                logging.error("Origin %s has Errors --> can't process .graph()"
+                    % self.uri)
+                return g
 
         # TODO: find a better way to do this
         # Problems:
