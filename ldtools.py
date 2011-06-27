@@ -247,7 +247,6 @@ class SingleFileBackend(Backend):
     #    fn = FileBackend.build_filename(uri)
     #    fn = "%s.%s" % (fn, self.format)
     #    return os.path.join(self.folder, fn)
-
     def __init__(self, filename, format="xml"):
         # TODO: filename contains ".xml"
         assert os.path.exists(filename)
@@ -260,14 +259,21 @@ class SingleFileBackend(Backend):
             data = f.read()
         return data
 
-    def PUT(self, data, origin):
+    def PUT(self, graph, origin):
         import mimetypes
         mimetypes.init()
         content_type = mimetypes.types_map[".rdf"] # 'application/rdf+xml'
         # we want to update it --> it must exist first!
-        assert os.path.exists(filename)
+        assert os.path.exists(self.filename)
         data = graph.serialize(format=self.format)
-        with open(filename, "w") as f:
+        import shutil
+        now = datetime.datetime.strftime(datetime.datetime.utcnow(),
+                                         '%Y%m%d-%H%M%S')
+        assert now
+        old_version = u"%s_%s" % (self.filename, now)
+        shutil.copy(self.filename, old_version)
+        # TODO: git integration here ;-)
+        with open(self.filename, "w") as f:
             f.write(data)
 
 
@@ -527,8 +533,8 @@ class Resource(Model):
         if is_resource:
             logger.debug("%s . %s = Resource( %s )"
                          % (self._uri, predicate, object))
-            object, _created = Resource.objects.get_or_create(uri=object,
-                                                      origin=self._origin)
+            object, _created = Resource.objects.get_or_create(
+                uri=object, origin=self._origin)
 
         attr.add(object)
 
@@ -599,6 +605,14 @@ class Resource(Model):
         # TODO: use Collector objects as django does
         self.__class__.objects._storage.__delitem__(self.pk)
 
+    def save(self):
+        assert self in Resource.objects.filter(_origin=self._origin)
+        assert self in Resource.objects.filter(_origin=self._origin,
+            _has_changes=True)
+        assert len(list(Resource.objects.filter(_origin=self._origin,
+            _has_changes=True))) == 1
+        self._origin.PUT()
+        self._has_changes = False
 
 class OriginManager(Manager):
 
@@ -674,8 +688,8 @@ class Origin(Model):
         return str
 
     def has_unsaved_changes(self):
-        if any(o._has_changes for o in self.get_resources()\
-               if hasattr(o, '_has_changes')): return True
+        if any(resource._has_changes for resource in self.get_resources()\
+               if hasattr(resource, '_has_changes')): return True
         return False
 
     def get_resources(self):
