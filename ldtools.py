@@ -431,6 +431,17 @@ class Resource(Model):
                 else:
                     yield((self._uri, property, v))
 
+    def __setattr__(self, key, value):
+        # TODO: is there a better way to validate attributes?
+        if key in self._meta.fields:
+            field = self._meta.fields.get(key)
+            if field and value:
+                value = field.to_python(value)
+        elif not key.startswith("_"):
+            # rdf properties here
+            self._has_changes = True
+        Model.__setattr__(self, key, value)
+
 
 class OriginManager(Manager):
 
@@ -487,6 +498,11 @@ class Origin(Model):
             if hasattr(self, '_stats_process_time'):
                 str += u" (%s)" % self._stats_process_time
         return str
+
+    def has_unsaved_changes(self):
+        if any(o._has_changes for o in self.get_resources()\
+               if hasattr(o, '_has_changes')): return True
+        return False
 
     def get_resources(self):
         return [r for r in Origin.objects.all() if self == r._origin]
