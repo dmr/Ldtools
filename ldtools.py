@@ -11,6 +11,7 @@ import urllib2
 from rdflib import compare
 from urlparse import urlparse
 from xml.sax._exceptions import SAXParseException
+from rdflib.namespace import split_uri
 
 import socket;
 socket.setdefaulttimeout(5) # HACK, TODO: find a way to set this for request
@@ -497,6 +498,42 @@ class ResourceManager(Manager):
             return self.create(uri=uri, origin=origin), True
 
 
+
+def reverse_dict(dct):
+    # TODO rdflib.URIRef dict?
+    res = {}
+    for k,v in dct.iteritems():
+        res[v] = k
+    return safe_dict(res)
+    
+
+def predicate2pyattr(predicate, namespacedict):
+    #print predicate, type(predicate)
+    prefix, propertyname = split_uri(predicate)
+    assert prefix
+    assert propertyname
+    #if not "_" in propertyname:
+    #    logger.info("%s_%s may cause problems?" % (prefix, propertyname))
+    if not namespacedict[prefix]:
+        logger.warning("%s cannot be shortened" % predicate)
+        return predicate
+    predicate = u"%s_%s" % (namespacedict[prefix], propertyname)
+    #print predicate
+    return predicate
+
+def pyattr2predicate(pyattr, namespacedict):
+    #print pyattr
+    # TODO: urirefdict
+    if pyattr.startswith(u"http://"):
+        return rdflib.URIRef(pyattr)
+    splitlist = pyattr.split("_")
+    prefix = splitlist[0]
+    propertyname = u"_".join(splitlist[1:])
+    assert prefix, pyattr
+    assert propertyname, pyattr
+    assert namespacedict[prefix], pyattr
+    return rdflib.URIRef(u"%s%s" % (namespacedict[prefix], propertyname))
+
 class Resource(Model):
 
     _uri = URIRefField()
@@ -524,6 +561,8 @@ class Resource(Model):
                     logger.debug("Not a Resource URI because not valid: %s "
                                  "--> should be rdflib.Literals?" % object)
 
+        predicate = predicate2pyattr(predicate, self._origin._nsshortdict)
+
         if not hasattr(self, predicate):
             setattr(self, predicate, set())
 
@@ -543,8 +582,7 @@ class Resource(Model):
                ", ".join([unicode(v) for v in attr])))
 
         assert object in getattr(self, predicate)
-
-        assert isinstance(predicate, rdflib.URIRef)
+        #assert isinstance(predicate, rdflib.URIRef)
 
         # --> TODO: force_unicode when reconverting from __dict__?
         assert str(predicate) in self.__dict__
@@ -556,8 +594,9 @@ class Resource(Model):
             if len(self.foaf_name) > 1: str += u",..."
         assert isinstance(self._origin, Origin)
         str += u" [origin: %s]" % self._origin.uri
-        if hasattr(self, rdflib.RDF.type):
-            rdf_type = list(getattr(self, rdflib.RDF.type))
+        if hasattr(self, "rdf_type"): # rdflib.RDF.type):
+            rdf_type = list(self.rdf_type)
+            #list(getattr(self, rdflib.RDF.type))
             str += (u" rdf:type %s" % unicode(rdf_type[0]))
             if len(rdf_type) > 1: str += u",..."
         return str
@@ -575,7 +614,10 @@ class Resource(Model):
             # TODO: better idea how to do this?
             # __dict__ converts rdflib.urirefs to strings -->
             # converts back to uriref
-            property = rdflib.URIRef(property)
+
+            nsdict = dict(self._origin._graph.namespace_manager\
+                            .namespaces())
+            property = pyattr2predicate(property, nsdict)
 
             assert hasattr(property, "n3"), \
                 "property %s is not a rdflib object" % property
@@ -768,6 +810,10 @@ class Origin(Model):
 
         if not hasattr(self, "handled"):
             self._graph = g
+
+            #namespace short hand notation reverse dict
+            self._nsshortdict = reverse_dict(dict(self._graph\
+                .namespace_manager.namespaces()))
 
             self.handle_graph(
                 follow_uris=follow_uris,

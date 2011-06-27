@@ -22,8 +22,7 @@ class TestOriginGET(unittest2.TestCase):
         file = os.path.join(os.path.dirname(__file__),
                 "www_w3_org__People__Berners-Lee__card.xml")
         backend = ldtools.SingleFileBackend(file, format="xml")
-        self.origin = ldtools.Origin.objects.create(uri,
-                                                             BACKEND=backend)
+        self.origin = ldtools.Origin.objects.create(uri, BACKEND=backend)
         self.origin.GET()
 
         for r in ldtools.Resource.objects.all():
