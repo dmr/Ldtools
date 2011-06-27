@@ -150,11 +150,10 @@ class RestBackend(Backend):
             request = urllib2.Request(url=uri, headers=headers)
         except urllib2.HTTPError as e:
             if e.code == 401:
-                logger.error("Authorization Required: %s" % uri)
-            if not e.code in (401, 403, 404, 503):
+                origin.add_error(e.code)
+                return
+            else:
                 raise
-            origin.add_error(str(e.code))
-            return
 
         try:
             opener = urllib2.build_opener() #SmartRedirectHandler())
@@ -169,6 +168,7 @@ class RestBackend(Backend):
                 "text/xml",
                 "application/xml; charset=UTF-8",
                 "application/rdf+xml;charset=UTF-8",
+                "text/html; charset=utf-8",
                 #"application/json",
                 ]:
                 logger.warning("%s not supported by ldtools. %s response maybe "
@@ -177,21 +177,21 @@ class RestBackend(Backend):
 
             #print 'The Redirect Code was', result_file.status
             #assert result_file.status == 200
-
         except urllib2.HTTPError as e:
-            if e.code == 403:
-                logger.error("Forbidden: %s" % uri)
-            elif e.code == 503: #"Service Temporarily Unavailable"
-                logger.error("Service Temporarily Unavailable: %s" % uri)
-            raise
-
+            if e.code in [
+                403,
+                503, # Service Temporarily Unavailable
+                404, # Not Found
+                ]:
+                origin.add_error(e.code)
+                return
+            else:
+                raise
         except urllib2.URLError as e:
-            logger.error("Timeout: %s" % uri)
             origin.add_error("timeout")
             return
 
         content = result_file.read()
-
 
         # cache file for further investigazion --> TODO: delete later?
         if "DEBUG" in globals():
@@ -789,50 +789,31 @@ class Origin(Model):
         assert not hasattr(self, "handled")
         assert not list(self.get_resources())
 
-        def handle_follow_uri(o):
+        def force_create_origin(o, caused_by=None, # should be Origin object
+                                interrupt=False):
+
             if isinstance(o, rdflib.Literal):
+                # if follow_uri is used to manipulate which urirefs to follow
+                # this could be an error that occurs
                 logging.error(u"%s is Literal! Only URIRefs are allowed as "
                               u"follow_uri destination" % o.encode('utf8'))
                 return
 
             uri = hash_to_slash_uri(o)
-
             origin, created = Origin.objects.get_or_create(uri=uri)
             if created:
-                setattr(origin, '_created_by', self)
+                setattr(origin, '_created_by', caused_by)
+            if interrupt:
+                # TODO: possible improvement: check whether origin already crawled
+                logger.info("Interrupting to load %s because we need to "
+                        "process owl:imports %s first" % (caused_by.uri,
+                                                          origin.uri))
+                origin.GET()
 
-        def handle_owl_imports(o):
-            # TODO: owl:imports is always Origin? or could it be a Resource?
-
-            uri = hash_to_slash_uri(o)
-            origin, created = Origin.objects.get_or_create(uri)
-            if created:
-                setattr(origin, '_created_by', self)
-
-            # TODO: possible improvement: check whether origin already crawled
-
-            logger.info("Interrupting to load %s because we need to "
-                    "process owl:imports %s first" % (self.uri, origin.uri))
-            origin.GET()
-
-        def handle_properties(origin, subject, predicate, object):
+        def add_property_to_resource(origin, subject, predicate, object):
             resource, _created = Resource.objects.get_or_create(uri=subject,
                                                                 origin=self)
             resource.add_property(predicate, object)
-
-        handlers = []
-        to_handle = {}
-
-        to_handle[handle_follow_uri] = []
-        handlers.append((handle_follow_uri, to_handle[handle_follow_uri]))
-
-        if handle_owl_imports:
-            to_handle[handle_owl_imports] = []
-            handlers.append((handle_owl_imports,
-                             to_handle[handle_owl_imports]))
-
-        to_handle[handle_properties] = []
-        handlers.append((handle_properties, to_handle[handle_properties]))
 
         if follow_uris:
             follow_uris = [rdflib.URIRef(u) if not\
@@ -848,21 +829,17 @@ class Origin(Model):
 
             if handle_owl_imports:
                 if p == rdflib.OWL.imports:
-                    to_handle[handle_owl_imports].append(o)
+                    force_create_origin(o, caused_by=self, interrupt=True)
 
             if follow_uris:
                 if p in follow_uris:
-                    to_handle[handle_follow_uri].append(o)
+                    force_create_origin(o, caused_by=self)
+            #else:
+            #    # follow every URIRef! this could take a long time!
+            #    if type(o) == rdflib.URIRef:
+            #        force_create_origin(o, caused_by=self)
 
-            to_handle[handle_properties].append((self, s, p, o))
-
-        for handler, items in handlers:
-            if items:
-                for item in items:
-                    if isinstance(item, tuple):
-                        handler(*item)
-                    else:
-                        handler(item)
+            add_property_to_resource(self, s, p, o)
 
         for resource in self.get_resources():
             resource._has_changes = False
