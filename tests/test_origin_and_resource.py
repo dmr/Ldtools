@@ -30,7 +30,7 @@ class TestOriginGET(unittest2.TestCase):
         self.origin.GET()
 
     def test_graphs_equal(self):
-        g1 = self.origin._original_graph
+        g1 = self.origin._graph
         g2 = self.origin.graph()
 
         # normal rdflib.compare does not work correctly with
@@ -42,7 +42,7 @@ class TestOriginGET(unittest2.TestCase):
         self.assert_(compare.to_isomorphic(g1) == compare.to_isomorphic(g2))
 
     def test_graphs_namespace_bindings_equal(self):
-        nsbindungs_orig = dict(self.origin._original_graph.namespace_manager\
+        nsbindungs_orig = dict(self.origin._graph.namespace_manager\
             .namespaces())
         nsbindungs_new = dict(self.origin.graph().namespace_manager\
             .namespaces())

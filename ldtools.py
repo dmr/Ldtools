@@ -442,6 +442,13 @@ class Resource(Model):
             self._has_changes = True
         Model.__setattr__(self, key, value)
 
+    def delete(self):
+        if hasattr(self, "_has_changes"):
+            assert not self._has_changes
+        assert hasattr(self, "pk") and self.pk is not None
+        # TODO: use Collector objects as django does
+        self.__class__.objects._storage.__delitem__(self.pk)
+
 
 class OriginManager(Manager):
 
@@ -470,9 +477,16 @@ class OriginManager(Manager):
 
     @catchKeyboardInterrupt
     def GET_all(self, depth=2, **kwargs):
+        """ Crawls or Re-Crawls all Origins.
+        Passes Arguments to GET"""
         # TODO: limit crawling speed
+        for _i in range(depth):
+            for origin in self.all():
+                origin.GET(**kwargs)
 
-        func = lambda s: not hasattr(s, "processed")
+    @catchKeyboardInterrupt
+    def GET_uncrawled(self, depth=2, **kwargs):
+        func = lambda origin: True if not hasattr(origin, "_graph") else False
         for _i in range(depth):
             crawl = filter(func, self.all())
             if crawl:
@@ -519,11 +533,6 @@ class Origin(Model):
             handle_owl_imports=False,
             skip_urls=None
             ):
-        # TODO: recrawl/differences?
-
-        if hasattr(self, "processed") and self.processed:
-            logger.info(u"Already crawled: %s" % self.uri)
-            return
         logger.info(u"GET %s..." % self.uri)
 
         assert not self.has_unsaved_changes(), ("Please save all changes "
@@ -581,6 +590,30 @@ class Origin(Model):
         # conjunctiveGraph, unless there is only one graph within that
         assert len(list(g.contexts())) == 1
 
+        if hasattr(self, "_graph"):
+            # at this point we know that all changes are saved --> graph() == _graph
+            logger.info(u"Already crawled: %s. Comparing graphs..." % self.uri)
+
+            if not compare.to_isomorphic(self._graph) == \
+                   compare.to_isomorphic(g):
+                logging.warning("GET retrieved updates for %s!" % self.uri)
+                my_graph_diff(self._graph, g)
+
+                for resource in self.get_resources():
+                    resource.delete()
+
+                delattr(self, "handled")
+            else:
+                logging.error("GET %s still the same, boring" %self.uri)
+
+        self._graph = g
+
+        self.handle_graph(
+            follow_uris=follow_uris,
+            handle_owl_imports=handle_owl_imports,
+            skip_urls=skip_urls
+        )
+
         def triples_per_second(triples, time):
             # TODO: should be more accurate
             td = time
@@ -590,6 +623,11 @@ class Origin(Model):
                 triples_per_second = triples / total_seconds
                 return triples_per_second
             else: return
+
+    def handle_graph(self, follow_uris, handle_owl_imports, skip_urls):
+        assert hasattr(self, '_graph')
+        assert not hasattr(self, "handled")
+        assert not list(self.get_resources())
 
         def handle_follow_uri(o):
             if isinstance(o, rdflib.Literal):
@@ -641,10 +679,9 @@ class Origin(Model):
             follow_uris = [rdflib.URIRef(u) if not\
                 isinstance(u, rdflib.URIRef) else u for u in follow_uris]
 
-        self._original_graph = g
         start_time = datetime.datetime.now()
 
-        for s, p, o in g:
+        for s, p, o in self._graph:
             assert hasattr(s, "n3")
             #s = canonalize_uri(s)
 
@@ -673,11 +710,11 @@ class Origin(Model):
 
         self.stats['handle_graph'] = datetime.datetime.now() - start_time
 
-        g1 = self._original_graph
-        g2 = self.graph()
+        assert compare.to_isomorphic(self._graph) == \
+               compare.to_isomorphic(self.graph()), \
+               my_graph_diff(self._graph, self.graph())
 
-        assert compare.to_isomorphic(g1) == compare.to_isomorphic(g2), \
-            my_graph_diff(g1,g2)
+        self.handled = True
 
 
         if hasattr(self, '_original_graph'):
@@ -698,6 +735,8 @@ class Origin(Model):
         creates rdflib.ConjunctiveGraph because rdflib.Graph does not allow
         parsing plugins
         """
+        assert hasattr(self, '_graph')
+
         g = rdflib.graph.ConjunctiveGraph(identifier=self.uri)
 
         # TODO: find a better way to do this
@@ -706,16 +745,15 @@ class Origin(Model):
         #     isomorphic graphs but the resulting graph is is different
         #     if they miss
         #  2) doesn't detect duplicate definitions of namespaces
-        if hasattr(self, '_original_graph'):
-            namespaces = dict(self._original_graph.namespace_manager\
-                                .namespaces())
-            for prefix, namespace in safe_dict(namespaces).items():
-                g.bind(prefix=prefix, namespace=namespace)
-            new_ns = dict(g.namespace_manager.namespaces())
+        namespaces = dict(self._graph.namespace_manager\
+                            .namespaces())
+        for prefix, namespace in safe_dict(namespaces).items():
+            g.bind(prefix=prefix, namespace=namespace)
+        new_ns = dict(g.namespace_manager.namespaces())
 
-            assert namespaces == new_ns, [(k, v) for k, v in
-                      safe_dict(namespaces)\
-                      .items() if  not k in safe_dict(new_ns).keys()]
+        assert namespaces == new_ns, [(k, v) for k, v in
+                  safe_dict(namespaces)\
+                  .items() if  not k in safe_dict(new_ns).keys()]
 
         for resource in self.get_resources():
             for triple in resource.tripleserialize_iterator():
