@@ -122,6 +122,107 @@ class ObjectField(Field):
         return value
 
 
+
+
+class Backend(object):
+    """ Abstract Backend to demonstrate API
+    """
+    def GET(self):
+        raise NotImplementedError
+    def PUT(self):
+        raise NotImplementedError
+
+
+class RestBackend(Backend):
+    def GET(self, uri, origin): # TODO remove origin
+
+        """lookup URI"""
+        # TODO: friendly crawling: use robots.txt
+        # crawling speed limitations in robots.txt.
+
+        # TODO: rdf browser accept header literature?
+        headers = {'User-agent': __useragent__,
+                   'Accept':('application/rdf+xml,text/rdf+n3;q=0.9,'
+                             'application/xhtml+xml;q=0.5, */*;q=0.1')}
+
+        try:
+            request = urllib2.Request(url=uri, headers=headers)
+        except urllib2.HTTPError as e:
+            if e.code == 401:
+                logger.error("Authorization Required: %s" % uri)
+            if not e.code in (401, 403, 404, 503):
+                raise
+            origin.add_error(str(e.code))
+            return
+
+        try:
+            opener = urllib2.build_opener() #SmartRedirectHandler())
+            result_file = opener.open(request)
+            #print 'The original headers where', result_file.headers
+
+            if result_file.headers['Content-Type'] not in [
+                "application/rdf+xml",
+                "application/rdf+xml; charset=UTF-8",
+                "application/rdf+xml; qs=0.9",
+                "text/n3",
+                "text/xml",
+                "application/xml; charset=UTF-8",
+                "application/rdf+xml;charset=UTF-8",
+                #"application/json",
+                ]:
+                logger.warning("%s not supported by ldtools. %s response maybe "
+                    "in wrong format or Content Negotiation of server wring"
+                    % (result_file.headers['Content-Type'], uri))
+
+            #print 'The Redirect Code was', result_file.status
+            #assert result_file.status == 200
+
+        except urllib2.HTTPError as e:
+            if e.code == 403:
+                logger.error("Forbidden: %s" % uri)
+            elif e.code == 503: #"Service Temporarily Unavailable"
+                logger.error("Service Temporarily Unavailable: %s" % uri)
+            raise
+
+        except urllib2.URLError as e:
+            logger.error("Timeout: %s" % uri)
+            origin.add_error("timeout")
+            return
+
+        content = result_file.read()
+
+
+        # cache file for further investigazion --> TODO: delete later?
+        if "DEBUG" in globals():
+            def build_filename(uri):
+                return uri.lstrip("http://").replace(".","_")\
+                    .replace("/","__").replace("?","___").replace("&","____")
+            import os
+            folder = os.path.abspath("cache")
+            if not os.path.exists(folder):
+                os.mkdir(folder)
+            filename = os.path.join(folder, build_filename(uri))
+            with open(filename, "w") as f:
+                f.write(content)
+
+        return content
+
+
+class FileBackend(Backend):
+    def __init__(self, filename):
+        import os
+        assert os.path.exists(filename)
+        self.filename = filename
+
+    def GET(self):
+        with open(self.filename, "r") as f:
+            data = f.read()
+        return data
+
+
+
+
+
 class Options(object):
 
     def __init__(self, meta, attrs):
@@ -449,38 +550,6 @@ class Resource(Model):
         # TODO: use Collector objects as django does
         self.__class__.objects._storage.__delitem__(self.pk)
 
-class Backend(object):
-    """ Abstract Backend to demonstrate API
-    """
-    def GET(self):
-        raise NotImplementedError
-    def PUT(self):
-        raise NotImplementedError
-
-class RestBackend(Backend):
-    def GET(self, uri, origin): # TODO remove origin
-        try:
-            data = get_uri_content(uri)
-        except urllib2.HTTPError as e:
-            if not e.code in (401, 403, 404, 503):
-                raise
-            origin.add_error(str(e.code))
-            return
-        except urllib2.URLError as e:
-            origin.add_error("timeout")
-            return
-        return data
-
-class FileBackend(Backend):
-    def __init__(self, filename):
-        import os
-        assert os.path.exists(filename)
-        self.filename = filename
-
-    def GET(self):
-        with open(self.filename, "r") as f:
-            data = f.read()
-        return data
 
 class OriginManager(Manager):
 
@@ -798,76 +867,6 @@ class Origin(Model):
 
     def get_resources(self):
         return Resource.objects.filter(_origin=self)
-
-
-def get_uri_content(uri):
-    """lookup URI"""
-    # TODO: friendly crawling: use robots.txt
-    # crawling speed limitations in robots.txt.
-
-    # TODO: rdf browser accept header literature?
-    headers = {'User-agent': __useragent__,
-               'Accept':('application/rdf+xml,text/rdf+n3;q=0.9,'
-                         'application/xhtml+xml;q=0.5, */*;q=0.1')}
-
-    try:
-        request = urllib2.Request(url=uri, headers=headers)
-    except urllib2.HTTPError as e:
-        if e.code == 401:
-            logger.error("Authorization Required: %s" % uri)
-        raise
-
-    try:
-        opener = urllib2.build_opener() #SmartRedirectHandler())
-        result_file = opener.open(request)
-        #print 'The original headers where', result_file.headers
-
-        if result_file.headers['Content-Type'] not in [
-            "application/rdf+xml",
-            "application/rdf+xml; charset=UTF-8",
-            "application/rdf+xml; qs=0.9",
-            "text/n3",
-            "text/xml",
-            "application/xml; charset=UTF-8",
-            "application/rdf+xml;charset=UTF-8",
-            #"application/json",
-            ]:
-            logger.warning("%s not supported by ldtools. %s response maybe "
-                "in wrong format or Content Negotiation of server wring"
-                % (result_file.headers['Content-Type'], uri))
-
-        #print 'The Redirect Code was', result_file.status
-        #assert result_file.status == 200
-
-    except urllib2.HTTPError as e:
-        if e.code == 403:
-            logger.error("Forbidden: %s" % uri)
-        elif e.code == 503: #"Service Temporarily Unavailable"
-            logger.error("Service Temporarily Unavailable: %s" % uri)
-        raise
-
-    except urllib2.URLError as e:
-        logger.error("Timeout: %s" % uri)
-        raise
-
-    content = result_file.read()
-
-
-    # cache file for further investigazion --> TODO: delete later?
-    if "DEBUG" in globals():
-        def build_filename(uri):
-            return uri.lstrip("http://").replace(".","_")\
-                .replace("/","__").replace("?","___").replace("&","____")
-        import os
-        folder = os.path.abspath("cache")
-        if not os.path.exists(folder):
-            os.mkdir(folder)
-        filename = os.path.join(folder, build_filename(uri))
-        with open(filename, "w") as f:
-            f.write(content)
-
-
-    return content
 
 
 # TODO: this is just for convenience --> remove once stable
