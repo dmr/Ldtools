@@ -449,6 +449,38 @@ class Resource(Model):
         # TODO: use Collector objects as django does
         self.__class__.objects._storage.__delitem__(self.pk)
 
+class Backend(object):
+    """ Abstract Backend to demonstrate API
+    """
+    def GET(self):
+        raise NotImplementedError
+    def PUT(self):
+        raise NotImplementedError
+
+class RestBackend(Backend):
+    def GET(self, uri, origin): # TODO remove origin
+        try:
+            data = get_uri_content(uri)
+        except urllib2.HTTPError as e:
+            if not e.code in (401, 403, 404, 503):
+                raise
+            origin.add_error(str(e.code))
+            return
+        except urllib2.URLError as e:
+            origin.add_error("timeout")
+            return
+        return data
+
+class FileBackend(Backend):
+    def __init__(self, filename):
+        import os
+        assert os.path.exists(filename)
+        self.filename = filename
+
+    def GET(self):
+        with open(self.filename, "r") as f:
+            data = f.read()
+        return data
 
 class OriginManager(Manager):
 
@@ -457,10 +489,12 @@ class OriginManager(Manager):
             "Resource.objects.create(...,auto_origin=True) is what you are "
             "looking for." % uri)
 
-    def create(self, uri):
+    def create(self, uri, BACKEND=RestBackend()):
         uri = canonalize_uri(uri)
         self.create_hook(uri)
-        return super(OriginManager, self).create(pk=uri, uri=uri)
+        backend = BACKEND
+        return super(OriginManager, self).create(pk=uri, uri=uri,
+                                                 backend=backend)
 
     def get(self, uri):
         """Retrieves Origin object from Store"""
@@ -497,7 +531,8 @@ class Origin(Model):
 
     uri = URIRefField()
     objects = OriginManager()
-
+    backend = ObjectField()
+    
     def add_error(self, error):
         if not hasattr(self, 'errors'): self.errors = []
         self.errors.append(error)
@@ -546,16 +581,8 @@ class Origin(Model):
 
         g = rdflib.graph.ConjunctiveGraph(identifier=self.uri)
 
-        try:
-            data = get_uri_content(self.uri)
-        except urllib2.HTTPError as e:
-            if not e.code in (401, 403, 404, 503):
-                raise
-            self.add_error(str(e.code))
-            self.processed = True
-            return
-        except urllib2.URLError as e:
-            self.add_error("timeout")
+        data = self.backend.GET(uri=self.uri, origin=self)
+        if not data:
             self.processed = True
             return
 
