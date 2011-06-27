@@ -631,15 +631,16 @@ class Origin(Model):
 
                 delattr(self, "handled")
             else:
-                logging.error("GET %s still the same, boring" %self.uri)
+                logging.info("GET %s still the same, boring" %self.uri) # TODO: remove later
 
-        self._graph = g
+        if not hasattr(self, "handled"):
+            self._graph = g
 
-        self.handle_graph(
-            follow_uris=follow_uris,
-            handle_owl_imports=handle_owl_imports,
-            skip_urls=skip_urls
-        )
+            self.handle_graph(
+                follow_uris=follow_uris,
+                handle_owl_imports=handle_owl_imports,
+                skip_urls=skip_urls
+            )
 
         def triples_per_second(triples, time):
             # TODO: should be more accurate
@@ -689,8 +690,7 @@ class Origin(Model):
             if created:
                 setattr(origin, '_created_by', self)
 
-            if (hasattr(origin, "processed") and origin.processed):
-                return
+            # TODO: possible improvement: check whether origin already crawled
 
             logger.info("Interrupting to load %s because we need to "
                     "process owl:imports %s first" % (self.uri, origin.uri))
