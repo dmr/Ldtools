@@ -623,6 +623,19 @@ class Origin(Model):
                 triples_per_second = triples / total_seconds
                 return triples_per_second
             else: return
+        if hasattr(self, '_graph'):
+            triples = len(self._graph)
+            tps = triples_per_second(triples, self.stats['handle_graph'])
+            if tps:
+                logger.info(
+                    "Crawled %s: '%s' triples in '%s' seconds --> '%s' "
+                    "triples/second" % (self.uri, triples,
+                                        self.stats['handle_graph'], tps))
+            else:
+                logger.info("Crawled %s in '%s' seconds"
+                % (self.uri, self.stats['handle_graph']))
+            pass
+
 
     def handle_graph(self, follow_uris, handle_owl_imports, skip_urls):
         assert hasattr(self, '_graph')
@@ -717,18 +730,6 @@ class Origin(Model):
         self.handled = True
 
 
-        if hasattr(self, '_original_graph'):
-            triples = len(self._original_graph)
-            tps = triples_per_second(triples, self._stats_process_time)
-            if tps:
-                logger.info(
-                    "Crawled %s: '%s' triples in '%s' seconds --> '%s' "
-                    "triples/second" % (self.uri, triples,
-                                        self._stats_process_time, tps))
-            else:
-                logger.info("Crawled %s in '%s' seconds"
-                % (self.uri, self._stats_process_time))
-            pass
 
     def graph(self):
         """Processes every Resource and Property related to 'self' and
