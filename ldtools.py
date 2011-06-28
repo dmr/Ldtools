@@ -582,11 +582,6 @@ class Resource(Model):
 
         predicate = predicate2pyattr(predicate, self._origin._nsshortdict)
 
-        if not hasattr(self, predicate):
-            setattr(self, predicate, set())
-
-        attr = getattr(self, predicate)
-        assert type(attr) == set
 
         if is_resource:
             logger.debug("%s . %s = Resource( %s )"
@@ -594,15 +589,31 @@ class Resource(Model):
             object, _created = Resource.objects.get_or_create(
                 uri=object, origin=self._origin)
 
-        attr.add(object)
+            if not hasattr(object, "_reverse"):
+                object._reverse = {}
+            if predicate in object._reverse:
+                if not isinstance(object._reverse[predicate], set):
+                    object._reverse[predicate] = set([object._reverse[predicate]])
+                object._reverse[predicate].add(self)
+            else:
+                object._reverse[predicate] = self
+
+
+        if hasattr(self, predicate):
+            attr = getattr(self, predicate)
+            if not type(attr) == set:
+                setattr(self, predicate, set([attr]))
+                attr = getattr(self, predicate)
+            attr.add(object)
+            assert object in getattr(self, predicate)
+        else:
+            setattr(self, predicate, object)
+            attr = getattr(self, predicate)
+            #assert attr == object
 
         logger.debug(u"Contribute_to_object %s: %s = %s"
-            % (self, predicate.encode('utf8'),
-               ", ".join([unicode(v) for v in attr])))
-
-        assert object in getattr(self, predicate)
-        #assert isinstance(predicate, rdflib.URIRef)
-
+            % (self, predicate.encode('utf8'), attr))
+        
         # --> TODO: force_unicode when reconverting from __dict__?
         assert str(predicate) in self.__dict__
 
@@ -611,13 +622,14 @@ class Resource(Model):
         if hasattr(self, 'foaf_name'):
             str += u' "%s"' % unicode(self.foaf_name)
             if len(self.foaf_name) > 1: str += u",..."
-        assert isinstance(self._origin, Origin)
-        str += u" [origin: %s]" % self._origin.uri
-        if hasattr(self, "rdf_type"): # rdflib.RDF.type):
-            rdf_type = list(self.rdf_type)
-            #list(getattr(self, rdflib.RDF.type))
-            str += (u" rdf:type %s" % unicode(rdf_type[0]))
-            if len(rdf_type) > 1: str += u",..."
+        if hasattr(self, "_origin"):
+            assert isinstance(self._origin, Origin), "%s" % (getattr(self, "_origin", None))
+            str += u" [origin: %s]" % self._origin.uri
+        #if hasattr(self, "rdf_type"): # rdflib.RDF.type):
+        #    rdf_type = list(self.rdf_type)
+        #    #list(getattr(self, rdflib.RDF.type))
+        #    str += (u" rdf:type %s" % unicode(rdf_type[0]))
+        #    if len(rdf_type) > 1: str += u",..."
         return str
 
     def tripleserialize_iterator(self):
@@ -628,12 +640,9 @@ class Resource(Model):
             if str(property).startswith("_") or property == "pk":
                 continue
 
-            assert isinstance(values, set), property
-
             # TODO: better idea how to do this?
             # __dict__ converts rdflib.urirefs to strings -->
             # converts back to uriref
-
             nsdict = dict(self._origin._graph.namespace_manager\
                             .namespaces())
             property = pyattr2predicate(property, nsdict)
@@ -641,12 +650,24 @@ class Resource(Model):
             assert hasattr(property, "n3"), \
                 "property %s is not a rdflib object" % property
 
-            for v in values:
+
+            if isinstance(values, set):
+
+                for v in values:
+                    if isinstance(v, self.__class__):
+                        # If object is referenced in attribute, "de-reference"
+                        yield((self._uri, property, v._uri))
+                    else:
+                        yield((self._uri, property, v))
+
+            else:
+                v = values
                 if isinstance(v, self.__class__):
                     # If object is referenced in attribute, "de-reference"
                     yield((self._uri, property, v._uri))
                 else:
                     yield((self._uri, property, v))
+
 
     def __setattr__(self, key, value):
         # TODO: is there a better way to validate attributes?
