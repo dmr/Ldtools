@@ -119,7 +119,6 @@ class URIRefField(Field):
         else:
             value = rdflib.URIRef(u'')
         return value
-
 class ObjectField(Field):
     def to_python(self, value=None):
         return value
@@ -137,6 +136,11 @@ class Backend(object):
 
 
 class RestBackend(Backend):
+
+    def __init__(self):
+        super(Backend, self).__init__()
+        self.format = "xml"
+
     def GET(self, uri, origin): # TODO remove origin
         """lookup URI"""
         # TODO: friendly crawling: use robots.txt
@@ -178,6 +182,7 @@ class RestBackend(Backend):
 
             #print 'The Redirect Code was', result_file.status
             #assert result_file.status == 200
+            # TODO: set self.format according to response format
         except urllib2.HTTPError as e:
             if e.code in [
                 403,
@@ -212,12 +217,14 @@ class RestBackend(Backend):
     def PUT(self, graph, origin):
         import mimetypes
         mimetypes.init()
-        content_type = mimetypes.types_map[".rdf"] # 'application/rdf+xml'
+
+        # 'application/rdf+xml'
+        content_type = mimetypes.types_map[".%s" % self.format]
 
         self.format = content_type
 
         # TODO: maybe 'pretty-xml'?
-        data = graph.serialize(format="xml")
+        data = graph.serialize(format=self.format)
 
         # TODO: authentication? oauth?
         #h = httplib2.Http()
@@ -249,7 +256,7 @@ class SingleFileBackend(Backend):
     #    fn = "%s.%s" % (fn, self.format)
     #    return os.path.join(self.folder, fn)
     def __init__(self, filename, format="xml"):
-        # TODO: filename contains ".xml"
+        # TODO: filename already contains ".xml"
         assert os.path.exists(filename)
         self.filename = filename
         # TODO: assert format in rdflib.parserplugins
@@ -263,7 +270,10 @@ class SingleFileBackend(Backend):
     def PUT(self, graph, origin):
         import mimetypes
         mimetypes.init()
-        content_type = mimetypes.types_map[".rdf"] # 'application/rdf+xml'
+
+        # 'application/rdf+xml'
+        content_type = mimetypes.types_map[".%s" % self.format]
+
         # we want to update it --> it must exist first!
         assert os.path.exists(self.filename)
         data = graph.serialize(format=self.format)
@@ -534,6 +544,8 @@ def pyattr2predicate(pyattr, namespacedict):
     assert namespacedict[prefix], pyattr
     return rdflib.URIRef(u"%s%s" % (namespacedict[prefix], propertyname))
 
+
+
 class Resource(Model):
 
     _uri = URIRefField()
@@ -765,10 +777,11 @@ class Origin(Model):
             # Important: Do not pass data=data without publicID=uri because
             # relative URIs (#deri) won't be an absolute uri in that case!
             assert data
-            g.parse(data=data, publicID=self.uri)
+            g.parse(data=data, publicID=self.uri, format=self.backend.format)
         except SAXParseException:
             self.add_error("SAXParseException")
             logger.error("SAXParseException: %s" % self)
+            raise
         except rdflib.exceptions.ParserError:
             self.add_error("ParserError")
             logger.error("ParserError: %s" % self)
