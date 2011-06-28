@@ -109,6 +109,7 @@ class StringField(Field):
     def to_python(self, value=None):
         return unicode(value) or u""
 
+
 class URIRefField(Field):
     def to_python(self, value=None):
         if value:
@@ -352,10 +353,16 @@ class Model(object):
                 % (', '.join(kwargs.keys()), self.__class__.__name__))
 
     def __eq__(self, other):
-        return (type(other) == type(self) and
-                other.__dict__.keys() == self.__dict__.keys() and
-                all(getattr(other, key) == getattr(self, key)
-                    for key in self.__dict__.keys()))
+        if not type(other) == type(self):
+            return False
+        if not other.__dict__.keys() == self.__dict__.keys():
+            return False
+        if not all(getattr(other, key) == getattr(self, key)
+                    for key in self.__dict__.keys()):
+            return False
+        return True
+
+
     def __ne__(self, other):
         if type(other) != type(self):
             return True
