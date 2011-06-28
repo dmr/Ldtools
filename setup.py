@@ -24,6 +24,7 @@ setup(
         'Intended Audience :: Developers',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
+        'License :: OSI Approved :: BSD License',
     ],
     setup_requires = ['rdflib'],
     test_requires = ['nose'],
