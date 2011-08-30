@@ -1,12 +1,6 @@
 from ldtools import Resource, Origin
 import rdflib
 
-import logging
-ch = logging.StreamHandler();
-l = logging.getLogger()
-l.addHandler(ch)
-l.setLevel(logging.INFO)
-
 import ldtools; ldtools.DEBUG=True
 
 # First, we define the Resource object and thereby its Origin object
@@ -18,11 +12,12 @@ assert len(Origin.objects.all()) == 1
 
 # Process it, hopefully discovering more Origins in there (rdfs:seeAlso, owl:sameAs...)
 # process it
-r._origin.GET(GRAPH_SIZE_LIMIT=25000, follow_uris=[rdflib.RDFS.seeAlso,
-                                                   rdflib.OWL.sameAs],
-          handle_owl_imports=True)
+r._origin.GET(
+    GRAPH_SIZE_LIMIT=25000,
+    follow_uris=[rdflib.RDFS.seeAlso, rdflib.OWL.sameAs],
+    handle_owl_imports=True)
 
-assert len(Resource.objects.all()) > 1
+assert len(Resource.objects.all()) > 1, Resource.objects.all()[0].__dict__
 assert len(Origin.objects.all()) > 1
 
 Origin.objects.GET_all()
