@@ -763,14 +763,16 @@ class Origin(Model):
 
     def __unicode__(self):
         str = u"%s" % unicode(self.uri)
+        str += " %s" % self.backend.__class__.__name__
         if hasattr(self, 'errors'):
             for error in self.errors: str += u" %s" % error
         if hasattr(self, 'processed'):
             str += u" Processed"
             if hasattr(self, 'stats'):
-                if hasattr(self, 'handle_graph'):
+                if 'handle_graph' in self.stats:
                     str += u" (%s)" % self.stats['handle_graph']
                 else:
+                    print self.stats
                     raise NotImplementedError
         return str
 
