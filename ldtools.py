@@ -154,7 +154,16 @@ class Backend(object):
     def PUT(self):
         raise NotImplementedError
 
+    @staticmethod
+    def build_filename_from_uri(uri):
+        file_name = uri.lstrip("http://").replace(".","_")\
+            .replace("/","__").replace("?","___").replace("&","____")
 
+        folder = os.path.abspath("cache")
+        if not os.path.exists(folder):
+            os.mkdir(folder)
+
+        return os.path.join(folder, file_name)
 
 
 class RestBackend(Backend):
@@ -198,17 +207,9 @@ class RestBackend(Backend):
         content = result_file.read()
 
         # cache file for further investigazion --> TODO: delete later?
-        if "DEBUG" in globals():
-            def build_filename(uri):
-                return uri.lstrip("http://").replace(".","_")\
-                    .replace("/","__").replace("?","___").replace("&","____")
-            import os
-            folder = os.path.abspath("cache")
-            if not os.path.exists(folder):
-                os.mkdir(folder)
-            filename = os.path.join(folder, build_filename(uri))
-            with open(filename, "w") as f:
-                f.write(content)
+        #if "DEBUG" in globals():
+        #    with open(filename, "w") as f:
+        #        f.write(content)
 
         return content
 
@@ -539,18 +540,26 @@ def predicate2pyattr(predicate, namespacedict):
     if not namespacedict[prefix]:
         logger.warning("%s cannot be shortened" % predicate)
         return predicate
-    predicate = u"%s_%s" % (namespacedict[prefix], propertyname)
-    #print predicate
-    return predicate
+    return u"%s_%s" % (namespacedict[prefix], propertyname)
 
 def pyattr2predicate(pyattr, namespacedict):
-    #print pyattr
-    # TODO: urirefdict
+    # TODO: build urirefdict instead of unicodedict?
+
     if pyattr.startswith(u"http://"):
         return rdflib.URIRef(pyattr)
+
     splitlist = pyattr.split("_")
-    prefix = splitlist[0]
-    propertyname = u"_".join(splitlist[1:])
+
+    # HACK: are there constrains for namespace prefixes?
+    if len(splitlist) > 2 and u"_".join(splitlist[0:2]) in namespacedict:
+        # http://www.geonames.org/ontology# defines 'wgs84_pos' --> \
+        # 'wgs84_pos_lat' cannot be solved with approach we took until now
+        prefix = u"_".join(splitlist[0:2])
+        property_name = u"_".join(splitlist[2:])
+    else:
+        prefix = splitlist[0]
+        property_name = u"_".join(splitlist[1:])
+
     assert prefix, pyattr
     assert property_name, pyattr
     assert namespacedict[prefix], pyattr
@@ -586,7 +595,6 @@ class Resource(Model):
 
         predicate = predicate2pyattr(predicate, self._origin._nsshortdict)
 
-
         if is_resource:
             logger.debug("%s . %s = Resource( %s )"
                          % (self._uri, predicate, object))
@@ -601,7 +609,6 @@ class Resource(Model):
                 object._reverse[predicate].add(self)
             else:
                 object._reverse[predicate] = self
-
 
         if hasattr(self, predicate):
             attr = getattr(self, predicate)
@@ -655,16 +662,13 @@ class Resource(Model):
             assert hasattr(property, "n3"), \
                 "property %s is not a rdflib object" % property
 
-
             if isinstance(values, set):
-
                 for v in values:
                     if isinstance(v, self.__class__):
                         # If object is referenced in attribute, "de-reference"
                         yield((self._uri, property, v._uri))
                     else:
                         yield((self._uri, property, v))
-
             else:
                 v = values
                 if isinstance(v, self.__class__):
