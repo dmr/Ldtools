@@ -684,7 +684,7 @@ class Resource(Model):
             field = self._meta.fields.get(key)
             if field and value:
                 value = field.to_python(value)
-        elif not key.startswith("_"):
+        elif not key.startswith("_") and not key == "pk": # TODO: --> _pk?
             # rdf properties here
             self._has_changes = True
         Model.__setattr__(self, key, value)
