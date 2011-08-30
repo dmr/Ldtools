@@ -2,10 +2,6 @@ import os
 from setuptools import setup, find_packages
 from ldtools import __version__
 
-f = open(os.path.join(os.path.dirname(__file__), 'README.rst'))
-readme = f.read()
-f.close()
-
 setup(
     name='Ldtools',
     version=__version__,
@@ -14,7 +10,9 @@ setup(
     author='Daniel Rech',
     author_email='daniel@nwebs.de',
     description='A lightweight orm for Linked Data',
-    long_description=readme,
+    long_description=("Ldtools provides a usable API for RDF data. Different "
+        "backends can either publish local data on the web or use data from "
+        "the web within your application."),
     py_modules=['ldtools'],
     zip_safe=False,
     platforms='any',
@@ -26,7 +24,7 @@ setup(
         'Programming Language :: Python',
         'License :: OSI Approved :: BSD License',
     ],
-    setup_requires = ['rdflib'],
-    test_requires = ['nose'],
-    test_suite = 'nose.collector',
+    install_requires=['rdflib'],
+    tests_require=['nose'],
+    test_suite='nose.collector',
 )

@@ -1,19 +1,19 @@
 # -*- coding: utf-8 -*-
 
-__version__ = "0.4.2"
+__version__ = "0.4.2.3"
 __useragent__ = ('ldtools-%s (http://github.com/dmr/ldtools, daniel@nwebs.de)'
                  % __version__)
 
-import os
 import datetime
+import mimetypes
+import os
 import rdflib
+import shutil
 import urllib2
+from rdflib.namespace import split_uri
 from rdflib import compare
 from urlparse import urlparse
 from xml.sax._exceptions import SAXParseException
-from rdflib.namespace import split_uri
-import shutil
-import mimetypes
 
 import socket;
 socket.setdefaulttimeout(5) # HACK, TODO: find a way to set this for request
@@ -498,7 +498,7 @@ class ResourceManager(Manager):
                 raise self.model.DoesNotExist
 
             assert len(filter_result) == 1, ("Please pass the exact "
-                "Origin. The Resource you are looking for is provided by: %s"\
+                "Origin. The Resource you are looking for is provided by: %s"
                 % ", ".join([r._origin for r in filter_result]))
 
             return filter_result[0]
@@ -725,7 +725,8 @@ class OriginManager(Manager):
         return super(OriginManager, self).get(pk=uri)
 
     def get_or_create(self, uri, **kwargs):
-        assert not kwargs, "If you intend to use 'backend' please use .create direktly"
+        assert not kwargs, ("If you intend to use 'backend' please use "
+            "Oritin.objects.create() directly")
         uri = canonalize_uri(uri)
         assert str(uri) == str(hash_to_slash_uri(uri))
         try:
@@ -822,7 +823,7 @@ class Origin(Model):
         except urllib2.URLError as e:
             self.add_error("timeout")
             return
-        assert self.backend.format, "even if backend.GET() fails we need format"
+        assert self.backend.format, "format is needed later"
 
         if not data:
             self.processed = True
@@ -864,7 +865,8 @@ class Origin(Model):
         assert len(list(graph.contexts())) == 1
 
         if hasattr(self, "_graph"):
-            # at this point we know that all changes are saved --> graph() == _graph
+            # we already assured that there are no unsaved_changes
+            # --> graph() == _graph
             logger.info(u"Already crawled: %s. Comparing graphs..." % self.uri)
 
             if not compare.to_isomorphic(self._graph) == \
@@ -876,9 +878,6 @@ class Origin(Model):
                     resource.delete()
 
                 delattr(self, "handled")
-            else:
-                # TODO: remove later
-                logging.info("GET %s not modified since last lookup." % self.uri)
 
         if not hasattr(self, "handled"):
             self._graph = graph
@@ -890,7 +889,6 @@ class Origin(Model):
             self.handle_graph(
                 follow_uris=follow_uris,
                 handle_owl_imports=handle_owl_imports,
-                #skip_urls=skip_urls
             )
 
         def triples_per_second(triples, time): # TODO make this more accurate
@@ -912,7 +910,7 @@ class Origin(Model):
             pass
 
 
-    def handle_graph(self, follow_uris, handle_owl_imports): #, skip_urls):
+    def handle_graph(self, follow_uris, handle_owl_imports):
         assert hasattr(self, '_graph')
         assert not hasattr(self, "handled")
         if not list(self.get_resources()):
@@ -934,7 +932,6 @@ class Origin(Model):
             if created:
                 setattr(origin, '_created_by', caused_by)
             if process_now:
-                # TODO: possible improvement: check whether origin already crawled
                 logger.info("Interrupting to load %s because we need to "
                         "process owl:imports %s first" % (caused_by.uri,
                                                           origin.uri))
