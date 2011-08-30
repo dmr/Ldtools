@@ -82,41 +82,47 @@ class TestManager(unittest2.TestCase):
         self.assertEqual(filter_result, [])
 
     def test_filter3(self):
-        pk = attr1 = u"a"
-        o1 = Sample3.objects.create(pk=pk, attr1=attr1)
-        pk = attr1 = u"b"
-        o2 = Sample3.objects.create(pk=pk, attr1=attr1)
-        pk = attr1 = u"c"
-        o3 = Sample3.objects.create(pk=pk, attr1=attr1)
+        o1, o2, o3 = self._create_objects(u"a", u"b", u"c")
+
         self.assertEqual(len(Sample3.objects.all()), 3)
         filter_result = list(Sample3.objects.filter(attr1="b"))
         self.assertEqual(len(filter_result), 1)
         self.assertIn(o2, filter_result)
 
-    def test_filter4(self):
-        pk = attr1 = u"a"
-        o1 = Sample3.objects.create(pk=pk, attr1=attr1)
-        pk = attr1 = u"b"
-        o2 = Sample3.objects.create(pk=pk, attr1=attr1)
-        pk = attr1 = u"c"
-        o3 = Sample3.objects.create(pk=pk, attr1=attr1)
-        self.assertEqual(len(Sample3.objects.all()), 3)
-        filter_result = list(Sample3.objects.filter(attr1="a"))
-        self.assertEqual(len(filter_result), 1)
-        self.assertIn(o1, filter_result)
+    def test_filter_attr_check(self):
+        o1, o2, o3 = self._create_objects(u"a", u"b", u"c")
 
-    def test_filter5(self):
-        pk = attr1 = u"a"
-        o1 = Sample3.objects.create(pk=pk, attr1=attr1)
-        pk = attr1 = u"b"
-        o2 = Sample3.objects.create(pk=pk, attr1=attr1)
-        pk = attr1 = u"c"
-        o3 = Sample3.objects.create(pk=pk, attr1=attr1)
-        self.assertEqual(len(Sample3.objects.all()), 3)
         filter_result = list(Sample3.objects.filter(attr1="b"))
         self.assertEqual(len(filter_result), 1)
         self.assertNotIn(o1, filter_result)
         self.assertNotIn(o3, filter_result)
+
+    def _create_objects(self, *args):
+        obj_list = []
+        for string in args:
+            pk = attr1 = string
+            obj_list.append(Sample3.objects.create(pk=pk, attr1=attr1))
+        return obj_list
+
+    def test_filter_allows_filtering_runtime_parameters1(self):
+        o1, o2 = self._create_objects(u"a", u"b")
+        o1.processed=True
+
+        filter_result = list(Sample3.objects.filter(processed=True))
+        self.assertEqual(len(filter_result), 1)
+        self.assertIn(o1, filter_result)
+        self.assertNotIn(o2, filter_result)
+
+    def test_filter_allows_filtering_runtime_parameters2(self):
+        o1, o2, o3 = self._create_objects(u"a", u"b", u"c")
+        o1.processed=True
+        o3.processed=True
+
+        filter_result = list(Sample3.objects.filter(processed=True))
+        self.assertEqual(len(filter_result), 2)
+        self.assertIn(o1, filter_result)
+        self.assertIn(o3, filter_result)
+        self.assertNotIn(o2, filter_result)
 
 class Sample4(models.Model):
     uri = models.URIRefField()
@@ -125,7 +131,6 @@ class TestModelURIRefField(unittest2.TestCase):
     def test_init(self):
         self.assertIn('pk',
                       Sample4(uri=rdflib.URIRef("test")).__dict__.keys())
-
 
 
 if __name__ == '__main__':
