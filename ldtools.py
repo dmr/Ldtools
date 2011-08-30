@@ -12,6 +12,8 @@ from rdflib import compare
 from urlparse import urlparse
 from xml.sax._exceptions import SAXParseException
 from rdflib.namespace import split_uri
+import shutil
+import mimetypes
 
 import socket;
 socket.setdefaulttimeout(5) # HACK, TODO: find a way to set this for request
@@ -130,19 +132,21 @@ class Backend(object):
     """ Abstract Backend to demonstrate API
     """
     # TODO: "Backend" if it manages one file/resource?
+
+    def __init__(self, uri):
+        self.uri = uri
+
     def GET(self):
         raise NotImplementedError
     def PUT(self):
         raise NotImplementedError
 
 
+
+
 class RestBackend(Backend):
 
-    def __init__(self):
-        super(Backend, self).__init__()
-        self.format = "xml"
-
-    def GET(self, uri, origin): # TODO remove origin
+    def GET(self):
         """lookup URI"""
         # TODO: friendly crawling: use robots.txt
         # crawling speed limitations in robots.txt.
@@ -152,51 +156,31 @@ class RestBackend(Backend):
                    'Accept':('application/rdf+xml,text/rdf+n3;q=0.9,'
                              'application/xhtml+xml;q=0.5, */*;q=0.1')}
 
-        try:
-            request = urllib2.Request(url=uri, headers=headers)
-        except urllib2.HTTPError as e:
-            if e.code == 401:
-                origin.add_error(e.code)
-                return
-            else:
-                raise
+        request = urllib2.Request(url=self.uri, headers=headers)
 
-        try:
-            opener = urllib2.build_opener() #SmartRedirectHandler())
-            result_file = opener.open(request)
-            #print 'The original headers where', result_file.headers
+        opener = urllib2.build_opener() #SmartRedirectHandler())
+        result_file = opener.open(request)
+        #print 'The original headers where', result_file.headers
 
-            if result_file.headers['Content-Type'] not in [
-                "application/rdf+xml",
-                "application/rdf+xml; charset=UTF-8",
-                "application/rdf+xml; qs=0.9",
-                "text/n3",
-                "text/xml",
-                "application/xml; charset=UTF-8",
-                "application/rdf+xml;charset=UTF-8",
-                "text/html; charset=utf-8",
-                #"application/json",
-                ]:
-                logger.warning("%s not supported by ldtools. %s response maybe "
-                    "in wrong format or Content Negotiation of server wring"
-                    % (result_file.headers['Content-Type'], uri))
+        if result_file.headers['Content-Type'] not in [
+            "application/rdf+xml",
+            "application/rdf+xml; charset=UTF-8",
+            "application/rdf+xml; qs=0.9",
+            "text/n3",
+            "text/xml",
+            "application/xml; charset=UTF-8",
+            "application/rdf+xml;charset=UTF-8",
+            "text/html; charset=utf-8",
+            #"application/json",
+            ]:
+            logger.warning("%s not supported by ldtools. %s response maybe "
+                "in wrong format or Content Negotiation of server wring"
+                % (result_file.headers['Content-Type'], self.uri))
 
-            #print 'The Redirect Code was', result_file.status
-            #assert result_file.status == 200
-            # TODO: set self.format according to response format
-        except urllib2.HTTPError as e:
-            if e.code in [
-                403,
-                503, # Service Temporarily Unavailable
-                404, # Not Found
-                ]:
-                origin.add_error(e.code)
-                return
-            else:
-                raise
-        except urllib2.URLError as e:
-            origin.add_error("timeout")
-            return
+        #print 'The Redirect Code was', result_file.status
+        #assert result_file.status == 200
+        # TODO: set self.format according to response format
+        self.format = "xml"
 
         content = result_file.read()
 
@@ -415,8 +399,8 @@ class Manager(object):
         def check_if_equals_or_in_set((key, value)):
             if hasattr(item, key):
                 items_value = getattr(item, key)
-                # TODO: inconsistent: can handle lists and strings!!! again,
-                # this is convenient but ugly
+                # TODO: inconsistent: can handle lists and strings!!!
+                # convenient but ugly
                 if type(items_value) in (set, list):
                     if value in items_value:
                         return True
@@ -464,6 +448,7 @@ class ResourceManager(Manager):
             obj = super(ResourceManager, self).create(pk=pk, _uri=uri,
                                                       _origin=origin)
             assert isinstance(obj._uri, rdflib.BNode)
+            assert not hasattr(obj, "_has_changes")
             return obj
         return super(ResourceManager, self).create(pk=pk, _uri=uri,
                                                    _origin=origin)
@@ -515,7 +500,6 @@ class ResourceManager(Manager):
             return self.create(uri=uri, origin=origin), True
 
 
-
 def reverse_dict(dct):
     # TODO rdflib.URIRef dict?
     res = {}
@@ -525,7 +509,6 @@ def reverse_dict(dct):
     
 
 def predicate2pyattr(predicate, namespacedict):
-    #print predicate, type(predicate)
     prefix, propertyname = split_uri(predicate)
     assert prefix
     assert propertyname
@@ -547,10 +530,9 @@ def pyattr2predicate(pyattr, namespacedict):
     prefix = splitlist[0]
     propertyname = u"_".join(splitlist[1:])
     assert prefix, pyattr
-    assert propertyname, pyattr
+    assert property_name, pyattr
     assert namespacedict[prefix], pyattr
-    return rdflib.URIRef(u"%s%s" % (namespacedict[prefix], propertyname))
-
+    return rdflib.URIRef(u"%s%s" % (namespacedict[prefix], property_name))
 
 
 class Resource(Model):
@@ -611,8 +593,8 @@ class Resource(Model):
             attr = getattr(self, predicate)
             #assert attr == object
 
-        logger.debug(u"Contribute_to_object %s: %s = %s"
-            % (self, predicate.encode('utf8'), attr))
+        #logger.debug(u"Contribute_to_object %s: %s = %s"
+        #    % (self, predicate.encode('utf8'), attr))
         
         # --> TODO: force_unicode when reconverting from __dict__?
         assert str(predicate) in self.__dict__
@@ -623,8 +605,9 @@ class Resource(Model):
             str += u' "%s"' % unicode(self.foaf_name)
             if len(self.foaf_name) > 1: str += u",..."
         if hasattr(self, "_origin"):
-            assert isinstance(self._origin, Origin), "%s" % (getattr(self, "_origin", None))
-            str += u" [origin: %s]" % self._origin.uri
+            assert isinstance(self._origin, Origin), \
+                    "%s" % (getattr(self, "_origin", None))
+            str += u" [%r]" % self._origin
         #if hasattr(self, "rdf_type"): # rdflib.RDF.type):
         #    rdf_type = list(self.rdf_type)
         #    #list(getattr(self, rdflib.RDF.type))
@@ -643,9 +626,9 @@ class Resource(Model):
             # TODO: better idea how to do this?
             # __dict__ converts rdflib.urirefs to strings -->
             # converts back to uriref
-            nsdict = dict(self._origin._graph.namespace_manager\
+            namespacedict = dict(self._origin._graph.namespace_manager\
                             .namespaces())
-            property = pyattr2predicate(property, nsdict)
+            property = pyattr2predicate(property, namespacedict)
 
             assert hasattr(property, "n3"), \
                 "property %s is not a rdflib object" % property
@@ -703,10 +686,10 @@ class OriginManager(Manager):
             "Resource.objects.create(...,auto_origin=True) is what you are "
             "looking for." % uri)
 
-    def create(self, uri, BACKEND=RestBackend()):
+    def create(self, uri, BACKEND=None):
         uri = canonalize_uri(uri)
         self.create_hook(uri)
-        backend = BACKEND
+        backend = BACKEND if BACKEND else RestBackend(uri)
         return super(OriginManager, self).create(pk=uri, uri=uri,
                                                  backend=backend)
 
@@ -794,18 +777,37 @@ class Origin(Model):
             self.processed = True
             return
 
-        g = rdflib.graph.ConjunctiveGraph(identifier=self.uri)
+        try:
+            data = self.backend.GET()
+        except urllib2.HTTPError as e:
+            if e.code in [
+                401,
 
-        data = self.backend.GET(uri=self.uri, origin=self)
+                403,
+                503, # Service Temporarily Unavailable
+                404, # Not Found
+                ]:
+                self.add_error(e.code)
+                return
+            else:
+                raise
+        except urllib2.URLError as e:
+            self.add_error("timeout")
+            return
+        assert self.backend.format, "even if backend.GET() fails we need format"
+
         if not data:
             self.processed = True
             return
+
+        graph = rdflib.graph.ConjunctiveGraph(identifier=self.uri)
 
         try:
             # Important: Do not pass data=data without publicID=uri because
             # relative URIs (#deri) won't be an absolute uri in that case!
             assert data
-            g.parse(data=data, publicID=self.uri, format=self.backend.format)
+            graph.parse(data=data, publicID=self.uri,
+                        format=self.backend.format)
         except SAXParseException:
             self.add_error("SAXParseException")
             logger.error("SAXParseException: %s" % self)
@@ -819,38 +821,39 @@ class Origin(Model):
             logger.error("IOError: %s" % self)
             print e
 
-        if not g:
+        if not graph:
             self.processed = True
             return
 
-        g_length = len(g)
+        g_length = len(graph)
         if g_length > 3000:
-            logger.warning("len(g) == %s" % g_length)
+            logger.warning("len(graph) == %s" % g_length)
             if g_length > GRAPH_SIZE_LIMIT:
                 logger.error("Nope."); return
 
         # normal rdflib.compare does not work correctly with
         # conjunctiveGraph, unless there is only one graph within that
-        assert len(list(g.contexts())) == 1
+        assert len(list(graph.contexts())) == 1
 
         if hasattr(self, "_graph"):
             # at this point we know that all changes are saved --> graph() == _graph
             logger.info(u"Already crawled: %s. Comparing graphs..." % self.uri)
 
             if not compare.to_isomorphic(self._graph) == \
-                   compare.to_isomorphic(g):
+                   compare.to_isomorphic(graph):
                 logging.warning("GET retrieved updates for %s!" % self.uri)
-                my_graph_diff(self._graph, g)
+                my_graph_diff(self._graph, graph)
 
                 for resource in self.get_resources():
                     resource.delete()
 
                 delattr(self, "handled")
             else:
-                logging.info("GET %s still the same, boring" %self.uri) # TODO: remove later
+                # TODO: remove later
+                logging.info("GET %s not modified since last lookup." % self.uri)
 
         if not hasattr(self, "handled"):
-            self._graph = g
+            self._graph = graph
 
             #namespace short hand notation reverse dict
             self._nsshortdict = reverse_dict(dict(self._graph\
@@ -859,18 +862,14 @@ class Origin(Model):
             self.handle_graph(
                 follow_uris=follow_uris,
                 handle_owl_imports=handle_owl_imports,
-                skip_urls=skip_urls
+                #skip_urls=skip_urls
             )
 
-        def triples_per_second(triples, time):
-            # TODO: should be more accurate
-            td = time
-            total_seconds = (td.microseconds+(td.seconds+\
-                                              td.days*24*3600)*10**6)//10**6
-            if total_seconds > 0:
-                triples_per_second = triples / total_seconds
-                return triples_per_second
-            else: return
+        def triples_per_second(triples, time): # TODO make this more accurate
+            total_seconds = (time.microseconds+(time.seconds+\
+                                      time.days*24*3600)*10**6)//10**6
+            return triples / total_seconds if total_seconds > 0 else None
+
         if hasattr(self, '_graph'):
             triples = len(self._graph)
             tps = triples_per_second(triples, self.stats['handle_graph'])
@@ -885,13 +884,15 @@ class Origin(Model):
             pass
 
 
-    def handle_graph(self, follow_uris, handle_owl_imports, skip_urls):
+    def handle_graph(self, follow_uris, handle_owl_imports): #, skip_urls):
         assert hasattr(self, '_graph')
         assert not hasattr(self, "handled")
-        assert not list(self.get_resources())
+        if not list(self.get_resources()):
+            logger.debug("Resources exist but no _graph --> Resources were "
+                         "created locally")
 
-        def force_create_origin(o, caused_by=None, # should be Origin object
-                                interrupt=False):
+        def create_origin(o, caused_by=None, # should be Origin object
+                                process_now=False):
 
             if isinstance(o, rdflib.Literal):
                 # if follow_uri is used to manipulate which urirefs to follow
@@ -904,7 +905,7 @@ class Origin(Model):
             origin, created = Origin.objects.get_or_create(uri=uri)
             if created:
                 setattr(origin, '_created_by', caused_by)
-            if interrupt:
+            if process_now:
                 # TODO: possible improvement: check whether origin already crawled
                 logger.info("Interrupting to load %s because we need to "
                         "process owl:imports %s first" % (caused_by.uri,
@@ -930,15 +931,15 @@ class Origin(Model):
 
             if handle_owl_imports:
                 if p == rdflib.OWL.imports:
-                    force_create_origin(o, caused_by=self, interrupt=True)
+                    create_origin(o, caused_by=self, process_now=True)
 
             if follow_uris:
                 if p in follow_uris:
-                    force_create_origin(o, caused_by=self)
+                    create_origin(o, caused_by=self)
             #else:
             #    # follow every URIRef! this could take a long time!
             #    if type(o) == rdflib.URIRef:
-            #        force_create_origin(o, caused_by=self)
+            #        create_origin(o, caused_by=self)
 
             add_property_to_resource(self, s, p, o)
 
@@ -959,8 +960,7 @@ class Origin(Model):
         if not self.has_unsaved_changes():
             logging.error("Nothing to PUT for %s!" % self.uri)
             return
-        g = self.graph()
-        self.backend.PUT(graph=g, origin=self)
+        self.backend.PUT(graph=self.graph())
         # TODO return?
 
 
