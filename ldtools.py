@@ -37,6 +37,19 @@ class MultipleObjectsReturned(Exception):
     silent_variable_failure = True
 
 
+def get_file_extension(filename):
+    """
+    >>> get_file_extension("test.xml")
+    'xml'
+    >>> get_file_extension("test.1234123.xml")
+    'xml'
+    >>> get_file_extension("test")
+    ''
+    """
+    extension = filename.split(".")[1:][-1:]
+    return str(extension[0]) if extension else ""
+
+
 def safe_dict(d):
     """Recursively clone json structure with UTF-8 dictionary keys"""
     if isinstance(d, dict):
@@ -199,7 +212,7 @@ class RestBackend(Backend):
 
         return content
 
-    def PUT(self, graph, origin):
+    def PUT(self, graph):
         import mimetypes
         mimetypes.init()
 
@@ -221,7 +234,7 @@ class RestBackend(Backend):
                  "User-Agent": __useragent__,
                  "Content-Length": str(len(data))}
         opener = urllib2.build_opener(urllib2.HTTPHandler)
-        request = urllib2.Request(origin.uri,
+        request = urllib2.Request(self.uri,
                                   data=data,
                                   headers=headers)
         request.get_method = lambda: 'PUT'
@@ -232,28 +245,23 @@ class SingleFileBackend(Backend):
     """Manages one xml file --> Uri that the user wants to "PUT" to is not
     flexible!
     """
-    #@staticmethod
-    #def build_filename(uri):
-    #    return uri.lstrip("http://").replace(".","_")\
-    #        .replace("/","__").replace("?","___").replace("&","____")
-    #def get_filename(self, uri):
-    #    fn = FileBackend.build_filename(uri)
-    #    fn = "%s.%s" % (fn, self.format)
-    #    return os.path.join(self.folder, fn)
-    def __init__(self, filename, format="xml"):
-        # TODO: filename already contains ".xml"
+
+    def __init__(self, uri, filename, format="xml"):
+        super(SingleFileBackend, self).__init__(uri)
+
+        # TODO: filename already contains ".xml" --> read from there
+        # TODO: make filename optional and calculate
         assert os.path.exists(filename)
         self.filename = filename
         # TODO: assert format in rdflib.parserplugins
         self.format = format
 
-    def GET(self, uri, origin):
+    def GET(self):
         with open(self.filename, "r") as f:
             data = f.read()
         return data
 
-    def PUT(self, graph, origin):
-        import mimetypes
+    def PUT(self, graph):
         mimetypes.init()
 
         # 'application/rdf+xml'
@@ -262,16 +270,30 @@ class SingleFileBackend(Backend):
         # we want to update it --> it must exist first!
         assert os.path.exists(self.filename)
         data = graph.serialize(format=self.format)
-        import shutil
+
         now = datetime.datetime.strftime(datetime.datetime.utcnow(),
                                          '%Y%m%d-%H%M%S')
         assert now
-        old_version = u"%s_%s" % (self.filename, now)
+
+        file_extension = get_file_extension(self.filename)
+        if file_extension:
+            old_version = u"%s.%s.%s" % (self.filename.strip(file_extension),
+                                         now, file_extension)
+        else:
+            old_version = u"%s_%s" % (self.filename, now)
+
         shutil.copy(self.filename, old_version)
-        # TODO: git integration here ;-)
+
         with open(self.filename, "w") as f:
             f.write(data)
+        self.old_version = old_version
 
+    def revert_to_old_version(self):
+        if hasattr(self, "old_version"):
+            logger.info("Reverting to version before last saved version")
+            shutil.copy(self.old_version, self.filename)
+            os.remove(self.old_version)
+            delattr(self, "old_version")
 
 
 class Options(object):
