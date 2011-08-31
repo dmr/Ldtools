@@ -656,20 +656,14 @@ class Resource(Model):
         #    if len(rdf_type) > 1: str += u",..."
         return str
 
-    def tripleserialize_iterator(self):
-        # TODO: self.get_property_dict() instead?
+    def _tripleserialize_iterator(self, namespace_dict):
         for property, values in self.__dict__.items():
 
             # skip internals
             if str(property).startswith("_") or property == "pk":
                 continue
 
-            # TODO: better idea how to do this?
-            # __dict__ converts rdflib.urirefs to strings -->
-            # converts back to uriref
-            namespacedict = dict(self._origin._graph.namespace_manager\
-                            .namespaces())
-            property = pyattr2predicate(property, namespacedict)
+            property = pyattr2predicate(property, namespace_dict)
 
             assert hasattr(property, "n3"), \
                 "property %s is not a rdflib object" % property
@@ -921,6 +915,49 @@ class Origin(Model):
                 % (self.uri, self.stats['handle_graph']))
             pass
 
+    def graph(self):
+        """Processes every Resource and Property related to 'self' and
+        creates rdflib.ConjunctiveGraph because rdflib.Graph does not allow
+        parsing plugins
+        """
+        # TODO: rdflib.graph() ?
+        g = rdflib.graph.ConjunctiveGraph(identifier=self.uri)
+
+        if not hasattr(self, '_graph'):
+            if len(self.errors) == 0:
+                self.GET() # TODO: test for recursion?
+            else:
+                logging.error("Origin %s has Errors --> can't process .graph()"
+                    % self.uri)
+                return g
+
+        # TODO: find a better way to do this
+        # Problems:
+        #  1) namespace bindings are not really necessary to validate
+        #     isomorphic graphs but the resulting graph is is different
+        #     if they miss
+        #  2) doesn't detect duplicate definitions of namespaces
+        namespaces = dict(self._graph.namespace_manager\
+                            .namespaces())
+        for prefix, namespace in safe_dict(namespaces).items():
+            g.bind(prefix=prefix, namespace=namespace)
+        new_ns = dict(g.namespace_manager.namespaces())
+
+        assert namespaces == new_ns, [(k, v) for k, v in
+                  safe_dict(namespaces)\
+                  .items() if  not k in safe_dict(new_ns).keys()]
+
+        for resource in self.get_resources():
+
+            # TODO: better idea how to do this?
+            # __dict__ converts rdflib.urirefs to strings -->
+            # converts back to uriref
+            # {'foaf': 'http:/....', ...}
+            namespace_dict = dict(self._graph.namespace_manager.namespaces())
+
+            for triple in resource._tripleserialize_iterator(namespace_dict):
+                g.add(triple)
+        return g
 
     def handle_graph(self, follow_uris, handle_owl_imports):
         assert hasattr(self, '_graph')
@@ -999,48 +1036,6 @@ class Origin(Model):
             return
         self.backend.PUT(graph=self.graph())
         # TODO return?
-
-
-    def graph(self):
-        """Processes every Resource and Property related to 'self' and
-        creates rdflib.ConjunctiveGraph because rdflib.Graph does not allow
-        parsing plugins
-        """
-        # TODO: rdflib.graph() ?
-        g = rdflib.graph.ConjunctiveGraph(identifier=self.uri)
-
-        if not hasattr(self, '_graph'):
-            if len(self.errors) == 0:
-                self.GET() # TODO: test for recursion?
-            else:
-                logging.error("Origin %s has Errors --> can't process .graph()"
-                    % self.uri)
-                return g
-
-        # TODO: find a better way to do this
-        # Problems:
-        #  1) namespace bindings are not really necessary to validate
-        #     isomorphic graphs but the resulting graph is is different
-        #     if they miss
-        #  2) doesn't detect duplicate definitions of namespaces
-        namespaces = dict(self._graph.namespace_manager\
-                            .namespaces())
-        for prefix, namespace in safe_dict(namespaces).items():
-            g.bind(prefix=prefix, namespace=namespace)
-        new_ns = dict(g.namespace_manager.namespaces())
-
-        assert namespaces == new_ns, [(k, v) for k, v in
-                  safe_dict(namespaces)\
-                  .items() if  not k in safe_dict(new_ns).keys()]
-
-        for resource in self.get_resources():
-            for triple in resource.tripleserialize_iterator():
-                g.add(triple)
-
-        return g
-
-    def get_resources(self):
-        return Resource.objects.filter(_origin=self)
 
 def check_shortcut_consistency():
     """Checks every known Origin for inconsistent namespacemappings"""
