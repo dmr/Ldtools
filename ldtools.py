@@ -309,6 +309,14 @@ class SingleFileBackend(Backend):
             delattr(self, "old_version")
 
 
+class SimpleMemoryBackend(Backend):
+    def __init__(self, data, format="xml"):
+        self.data = data
+        self.format = format
+    def GET(self, uri):
+        return self.data
+
+
 class Options(object):
 
     def __init__(self, meta, attrs):
