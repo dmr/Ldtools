@@ -382,20 +382,34 @@ class Model(object):
     def __eq__(self, other):
         if not type(other) == type(self):
             return False
-        if not other.__dict__.keys() == self.__dict__.keys():
+
+        if set(other.__dict__.keys()) != set(self.__dict__.keys()):
             return False
-        if not all(getattr(other, key) == getattr(self, key)
-                    for key in self.__dict__.keys()):
-            return False
+
+        #if set(self.__dict__.keys()) - set(other.__dict__.keys()):
+        #    return False
+
+        for key in self.__dict__.keys():
+            if (not hasattr(other, key) or
+                    getattr(self, key) != getattr(other, key)):
+                return False
+
         return True
 
 
     def __ne__(self, other):
         if type(other) != type(self):
             return True
-        if any(getattr(other, key) != getattr(self, key) \
-                   for key in self.__dict__.keys()):
+
+        if set(other.__dict__.keys()) != set(self.__dict__.keys()):
             return True
+
+        for key in self.__dict__.keys():
+            if (not hasattr(other, key) or
+                    getattr(other, key) != getattr(self, key)):
+                return True
+
+        return False
 
     def __hash__(self):
         # It is wrong to really compare the object here. This case is

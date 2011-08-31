@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import copy
 import ldtools as models
 import unittest2
 import rdflib
@@ -131,6 +132,46 @@ class TestModelURIRefField(unittest2.TestCase):
     def test_init(self):
         self.assertIn('pk',
                       Sample4(uri=rdflib.URIRef("test")).__dict__.keys())
+
+
+class ModelEqualityAndHashFunctionTest(unittest2.TestCase):
+    def setUp(self):
+        Sample3.objects.reset_store()
+
+    def test_is_equal_1(self):
+        o1 = Sample3.objects.create(pk=1, attr1="test")
+        o2 = Sample3.objects.create(pk=2, attr1="test")
+        # dirty trick to trick equality function
+        o2.pk = 1
+
+        self.assertEqual(o1, o2)
+
+    def test_is_equal_2(self):
+        o1 = Sample3.objects.create(pk=1, attr1="test")
+        o2 = Sample3.objects.create(pk=2, attr1="test2")
+        # dirty trick to trick equality function
+        o2.pk = 1
+
+        self.assert_(not o1 == o2)
+
+    def test_are_not_equal_1(self):
+        o1 = Sample3.objects.create(pk=1, attr1="test")
+        o2 = copy.copy(o1)
+        o1.another_attr = "val"
+
+        self.assertNotEqual(o1, o2)
+
+        # TODO: __hash__ should make the following statement true but it doesnt
+        # test_set = set()
+        #test_set.add(o1)
+        #test_set.add(o2)
+        #self.assertEqual(o1.pk, o2.pk)
+        #self.assertEqual(len(test_set), 1)
+
+    def test_are_not_equal_3(self):
+        o1 = Sample3.objects.create(pk=1, attr1="test1")
+        o2 = Sample3.objects.create(pk=2, attr1="test2")
+        self.assertNotEqual(o1, o2)
 
 
 if __name__ == '__main__':
