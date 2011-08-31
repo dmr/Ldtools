@@ -1030,6 +1030,18 @@ class Origin(Model):
     def get_resources(self):
         return Resource.objects.filter(_origin=self)
 
+def check_shortcut_consistency():
+    """Checks every known Origin for inconsistent namespacemappings"""
+    global_namespace_dict = {}
+    for origin in Origin.objects.all():
+        if hasattr(origin, "_graph"):
+            for k, v in dict(origin._graph.namespace_manager\
+                        .namespaces()).items():
+                print k,v
+                if k in global_namespace_dict:
+                    assert global_namespace_dict[k] == v
+                else:
+                    global_namespace_dict[k] = v
 
 # TODO: this is just for convenience --> remove once stable
 def my_graph_diff(graph1, graph2):
