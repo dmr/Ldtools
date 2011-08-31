@@ -606,7 +606,7 @@ class Resource(Model):
     _origin = ObjectField()
     objects = ResourceManager()
 
-    def add_property(self, predicate, object):
+    def _add_property(self, predicate, object):
         assert isinstance(predicate, rdflib.URIRef),\
             "Not an URIRef: %s"%predicate
         # TODO remove?
@@ -754,7 +754,7 @@ class OriginManager(Manager):
 
     def get_or_create(self, uri, **kwargs):
         assert not kwargs, ("If you intend to use 'backend' please use "
-            "Oritin.objects.create() directly")
+            "Origin.objects.create() directly")
         uri = canonalize_uri(uri)
         assert str(uri) == str(hash_to_slash_uri(uri))
         try:
@@ -808,14 +808,6 @@ class Origin(Model):
                     print self.stats
                     raise NotImplementedError
         return str
-
-    def has_unsaved_changes(self):
-        if any(resource._has_changes for resource in self.get_resources()\
-               if hasattr(resource, '_has_changes')): return True
-        return False
-
-    def get_resources(self):
-        return [r for r in Origin.objects.all() if self == r._origin]
 
     def GET(self,
             GRAPH_SIZE_LIMIT=25000,
@@ -937,6 +929,9 @@ class Origin(Model):
                 % (self.uri, self.stats['handle_graph']))
             pass
 
+    def get_resources(self):
+        return Resource.objects.filter(_origin=self)
+
     def graph(self):
         """Processes every Resource and Property related to 'self' and
         creates rdflib.ConjunctiveGraph because rdflib.Graph does not allow
@@ -1011,7 +1006,7 @@ class Origin(Model):
         def add_property_to_resource(origin, subject, predicate, object):
             resource, _created = Resource.objects.get_or_create(uri=subject,
                                                                 origin=self)
-            resource.add_property(predicate, object)
+            resource._add_property(predicate, object)
 
         if follow_uris:
             follow_uris = [rdflib.URIRef(u) if not\
@@ -1050,6 +1045,10 @@ class Origin(Model):
 
         self.handled = True
 
+    def has_unsaved_changes(self):
+        if any(resource._has_changes for resource in self.get_resources()\
+               if hasattr(resource, '_has_changes')): return True
+        return False
 
     def PUT(self):
         assert hasattr(self, "_graph")
