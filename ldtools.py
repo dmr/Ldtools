@@ -826,6 +826,8 @@ class Origin(Model):
             self.processed = True
             return
 
+        self.stats['last_processed'] = datetime.datetime.now()
+
         try:
             data = self.backend.GET(self.uri)
         except urllib2.HTTPError as e:
