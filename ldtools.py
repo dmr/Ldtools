@@ -144,12 +144,7 @@ class ObjectField(Field):
 class Backend(object):
     """ Abstract Backend to demonstrate API
     """
-    # TODO: "Backend" if it manages one file/resource?
-
-    def __init__(self, uri):
-        self.uri = uri
-
-    def GET(self):
+    def GET(self, uri):
         raise NotImplementedError
     def PUT(self):
         raise NotImplementedError
@@ -168,8 +163,16 @@ class Backend(object):
 
 class RestBackend(Backend):
 
-    def GET(self):
+    def GET(self, uri):
         """lookup URI"""
+
+        if not hasattr(self, "uri"):
+            self.uri = uri
+        else:
+            if not self.uri == uri:
+                raise Exception("You cannot pass different uris to the same "
+                                "backend")
+
         # TODO: friendly crawling: use robots.txt
         # crawling speed limitations in robots.txt.
 
@@ -214,6 +217,8 @@ class RestBackend(Backend):
         return content
 
     def PUT(self, graph):
+        assert self.uri, "GET has to be called before PUT possible"
+
         import mimetypes
         mimetypes.init()
 
@@ -247,9 +252,7 @@ class SingleFileBackend(Backend):
     flexible!
     """
 
-    def __init__(self, uri, filename, format="xml"):
-        super(SingleFileBackend, self).__init__(uri)
-
+    def __init__(self, filename, format="xml"):
         # TODO: filename already contains ".xml" --> read from there
         # TODO: make filename optional and calculate
         assert os.path.exists(filename)
@@ -257,12 +260,21 @@ class SingleFileBackend(Backend):
         # TODO: assert format in rdflib.parserplugins
         self.format = format
 
-    def GET(self):
+    def GET(self, uri):
+        if not hasattr(self, "uri"):
+            self.uri = uri
+        else:
+            if not self.uri == uri:
+                raise Exception("You cannot pass different uris to the same "
+                                "backend")
+
         with open(self.filename, "r") as f:
             data = f.read()
         return data
 
     def PUT(self, graph):
+        assert self.uri, "GET has to be called before PUT possible"
+
         mimetypes.init()
 
         # 'application/rdf+xml'
@@ -715,7 +727,7 @@ class OriginManager(Manager):
     def create(self, uri, BACKEND=None):
         uri = canonalize_uri(uri)
         self.create_hook(uri)
-        backend = BACKEND if BACKEND else RestBackend(uri)
+        backend = BACKEND if BACKEND else RestBackend()
         return super(OriginManager, self).create(pk=uri, uri=uri,
                                                  backend=backend)
 
@@ -807,7 +819,7 @@ class Origin(Model):
             return
 
         try:
-            data = self.backend.GET()
+            data = self.backend.GET(self.uri)
         except urllib2.HTTPError as e:
             if e.code in [
                 401,
