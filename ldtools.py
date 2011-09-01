@@ -164,6 +164,7 @@ class RestBackend(Backend):
 
     def GET(self, uri):
         """lookup URI"""
+        # TODO: friendly crawling: use robots.txt speed limitation definitions
 
         if not hasattr(self, "uri"):
             self.uri = uri
@@ -172,10 +173,6 @@ class RestBackend(Backend):
                 raise Exception("You cannot pass different uris to the same "
                                 "backend")
 
-        # TODO: friendly crawling: use robots.txt
-        # crawling speed limitations in robots.txt.
-
-        # TODO: rdf browser accept header literature?
         headers = {'User-agent': __useragent__,
                    'Accept':('application/rdf+xml,text/rdf+n3;q=0.9,'
                              'application/xhtml+xml;q=0.5, */*;q=0.1')}
@@ -184,47 +181,25 @@ class RestBackend(Backend):
 
         opener = urllib2.build_opener() #SmartRedirectHandler())
         result_file = opener.open(request)
-        #print 'The original headers where', result_file.headers
 
-        if result_file.headers['Content-Type'] not in [
-            "application/rdf+xml",
-            "application/rdf+xml; charset=UTF-8",
-            "application/rdf+xml; qs=0.9",
-            "text/n3",
-            "text/xml",
-            "application/xml; charset=UTF-8",
-            "application/rdf+xml;charset=UTF-8",
-            "text/html; charset=utf-8",
-            #"application/json",
-            ]:
-            logger.warning("%s not supported by ldtools. %s response maybe "
-                "in wrong format or Content Negotiation of server wring"
-                % (result_file.headers['Content-Type'], self.uri))
-
-        #print 'The Redirect Code was', result_file.status
-        #assert result_file.status == 200
-        # TODO: set self.format according to response format
-        self.format = "xml"
+        self.content_type = result_file.headers['Content-Type'].strip(";")
+        file_extension = mimetypes.guess_extension(self.content_type)
+        if file_extension:
+            format = file_extension.strip(".")
+            if format in ["rdf", "ksh"]:
+                format = "xml"
+            self.format = format
+        else:
+            logger.warning("%s not supported by ldtools. Trying 'xml'..."
+                           % result_file.headers['Content-Type'])
+            self.format = "xml"
+            self.content_type = mimetypes.types_map[".%s" % self.format]
 
         content = result_file.read()
-
-        # cache file for further investigazion --> TODO: delete later?
-        #if "DEBUG" in globals():
-        #    with open(filename, "w") as f:
-        #        f.write(content)
-
         return content
 
     def PUT(self, graph):
         assert self.uri, "GET has to be called before PUT possible"
-
-        import mimetypes
-        mimetypes.init()
-
-        # 'application/rdf+xml'
-        content_type = mimetypes.types_map[".%s" % self.format]
-
-        self.format = content_type
 
         data = graph.serialize(format=self.format)
 
@@ -234,9 +209,10 @@ class RestBackend(Backend):
         #resp, content = h.request(uri, "PUT", body=data, headers=headers)
         #if resp.status != 200: raise Error(resp.status, errmsg, headers)
         #return resp, content
-        headers={"content-type": content_type,
+        headers={"content-type": self.content_type,
                  "User-Agent": __useragent__,
                  "Content-Length": str(len(data))}
+
         opener = urllib2.build_opener(urllib2.HTTPHandler)
         request = urllib2.Request(self.uri,
                                   data=data,
@@ -255,7 +231,14 @@ class SingleFileBackend(Backend):
         self.filename = filename
 
         # TODO: assert format in rdflib.parserplugins
-        self.format = format if format else self.filename.split(".")[-1]
+        if format:
+            self.format = format
+        else:
+            file_extension = filename.split(".")[-1]
+            if filename != file_extension:
+                self.format = file_extension
+            else:
+                self.format = "xml"
 
     def GET(self, uri):
         if not hasattr(self, "uri"):
@@ -271,11 +254,6 @@ class SingleFileBackend(Backend):
 
     def PUT(self, graph):
         assert self.uri, "GET has to be called before PUT possible"
-
-        mimetypes.init()
-
-        # 'application/rdf+xml'
-        content_type = mimetypes.types_map[".%s" % self.format]
 
         if os.path.exists(self.filename):
             # File already exists. Make backup copy
@@ -450,7 +428,8 @@ class Manager(object):
             if value is in attr or if iterable inside the iterable"""
             if hasattr(item, key):
                 items_value = getattr(item, key)
-                if hasattr(items_value, "__iter__"):
+                # TODO why can't we check for hasattr(items_value, "__iter__")?
+                if type(items_value) in [list, set]:
                     if value in items_value:
                         return True
                 else:
