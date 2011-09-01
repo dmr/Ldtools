@@ -3,6 +3,7 @@ __version__ = "0.4.3"
 __useragent__ = ('ldtools-%s (http://github.com/dmr/ldtools, daniel@nwebs.de)'
                  % __version__)
 
+import copy
 import datetime
 import logging
 import mimetypes
@@ -156,6 +157,7 @@ class Backend(object):
         file_name = uri.lstrip("http://").replace(".","_")\
             .replace("/","__").replace("?","___").replace("&","____")
 
+        # TODO: hacky
         folder = os.path.abspath("cache")
         if not os.path.exists(folder):
             os.mkdir(folder)
@@ -580,6 +582,17 @@ class Resource(Model):
     _origin = ObjectField()
     objects = ResourceManager()
 
+    def get_attributes(self):
+        dct = copy.copy(self.__dict__)
+        for attr in [u"pk",
+            u"_origin",
+            u"_uri",
+            u"_reverse",
+            u"_has_changes"]:
+            if hasattr(self, attr):
+                dct.pop(attr)
+        return dct
+
     def _add_property(self, predicate, object):
         assert isinstance(predicate, rdflib.URIRef),\
             "Not an URIRef: %s"%predicate
@@ -642,15 +655,8 @@ class Resource(Model):
         if hasattr(self, 'foaf_name'):
             str += u' "%s"' % unicode(self.foaf_name)
             if len(self.foaf_name) > 1: str += u",..."
-        if hasattr(self, "_origin"):
-            assert isinstance(self._origin, Origin), \
-                    "%s" % (getattr(self, "_origin", None))
-            str += u" [%r]" % self._origin
-        if hasattr(self, "rdf_type"):
-            rdf_type = list(self.rdf_type)
-            str += (u" rdf:type %s" % unicode(rdf_type[0]))
-            if len(rdf_type) > 1:
-                str += u",..."
+        if hasattr(self, "_origin") and isinstance(self._origin, Origin):
+            str += u" [%r]" % self._origin.uri.encode("utf8")
         return str
 
     def _tripleserialize_iterator(self, namespace_dict):
@@ -770,6 +776,7 @@ class OriginManager(Manager):
                 for origin in crawl:
                     origin.GET(**kwargs)
 
+
 class Origin(Model):
 
     uri = URIRefField()
@@ -788,15 +795,10 @@ class Origin(Model):
         str = u"%s" % unicode(self.uri)
         str += " %s" % self.backend.__class__.__name__
         if hasattr(self, 'errors'):
-            for error in self.errors: str += u" %s" % error
+            for error in self.errors:
+                str += u" %s" % error
         if hasattr(self, 'processed'):
             str += u" Processed"
-            if hasattr(self, 'stats'):
-                if 'handle_graph' in self.stats:
-                    str += u" (%s)" % self.stats['handle_graph']
-                else:
-                    print self.stats
-                    raise NotImplementedError
         return str
 
     def GET(self,
@@ -859,11 +861,13 @@ class Origin(Model):
             # TODO: why does this occur? guess: wrong protocol
             self.add_error("IOError")
             logger.error("IOError: %s" % self)
-            print e
 
         if not graph:
             self.processed = True
             return
+
+        if hasattr(self, "errors"):
+            delattr(self, "errors")
 
         g_length = len(graph)
         if g_length > 3000:
@@ -909,15 +913,15 @@ class Origin(Model):
 
         if hasattr(self, '_graph'):
             triples = len(self._graph)
-            tps = triples_per_second(triples, self.stats['handle_graph'])
+            tps = triples_per_second(triples, self.stats['graph_processing_time'])
             if tps:
                 logger.info(
                     "Crawled %s: '%s' triples in '%s' seconds --> '%s' "
                     "triples/second" % (self.uri, triples,
-                                        self.stats['handle_graph'], tps))
+                                        self.stats['graph_processing_time'], tps))
             else:
                 logger.info("Crawled %s in '%s' seconds"
-                % (self.uri, self.stats['handle_graph']))
+                % (self.uri, self.stats['graph_processing_time']))
             pass
 
     def get_resources(self):
@@ -1027,7 +1031,7 @@ class Origin(Model):
         for resource in self.get_resources():
             resource._has_changes = False
 
-        self.stats['handle_graph'] = datetime.datetime.now() - start_time
+        self.stats['graph_processing_time'] = datetime.datetime.now() - start_time
 
         assert compare.to_isomorphic(self._graph) == \
                compare.to_isomorphic(self.graph()), \
