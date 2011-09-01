@@ -502,8 +502,9 @@ class ResourceManager(Manager):
             assert isinstance(obj._uri, rdflib.BNode)
             assert not hasattr(obj, "_has_changes")
             return obj
+
         return super(ResourceManager, self).create(pk=pk, _uri=uri,
-                                                   _origin=origin)
+                                                   _origin=origin, **kwargs)
 
     def get(self, uri, origin=None):
         """If the authoratative Origin to the Resource does not exist and no
