@@ -278,23 +278,19 @@ class SingleFileBackend(Backend):
         # 'application/rdf+xml'
         content_type = mimetypes.types_map[".%s" % self.format]
 
-        # we want to update it --> it must exist first!
-        assert os.path.exists(self.filename)
+        if os.path.exists(self.filename):
+            # File already exists. Make backup copy
+            now = datetime.datetime.strftime(datetime.datetime.utcnow(),
+                                             '%Y%m%d-%H%M%S')
+            file_extension = get_file_extension(self.filename)
+            if file_extension:
+                old_version = u"%s.%s.%s" % (self.filename.strip(file_extension),
+                                             now, file_extension)
+            else:
+                old_version = u"%s_%s" % (self.filename, now)
+            shutil.copy(self.filename, old_version)
+
         data = graph.serialize(format=self.format)
-
-        now = datetime.datetime.strftime(datetime.datetime.utcnow(),
-                                         '%Y%m%d-%H%M%S')
-        assert now
-
-        file_extension = get_file_extension(self.filename)
-        if file_extension:
-            old_version = u"%s.%s.%s" % (self.filename.strip(file_extension),
-                                         now, file_extension)
-        else:
-            old_version = u"%s_%s" % (self.filename, now)
-
-        shutil.copy(self.filename, old_version)
-
         with open(self.filename, "w") as f:
             f.write(data)
         self.old_version = old_version
