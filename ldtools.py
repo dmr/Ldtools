@@ -114,35 +114,135 @@ def hash_to_slash_uri(uri):
     return uri
 
 
-
-class Field(object):
-    def to_db(self, value=None):
-        if value is None:
-            value = ''
-        return value
-    def to_python(self, value=None):
-        return value
+def reverse_dict(dct):
+    # TODO rdflib.URIRef dict?
+    res = {}
+    for k,v in dct.iteritems():
+        res[v] = k
+    return safe_dict(res)
 
 
-class StringField(Field):
-    def to_python(self, value=None):
-        return unicode(value) or u""
+def predicate2pyattr(predicate, namespacedict):
+    prefix, propertyname = split_uri(predicate)
+    assert prefix
+    assert propertyname
+    #if not "_" in propertyname:
+    #    logger.info("%s_%s may cause problems?" % (prefix, propertyname))
+    if not namespacedict[prefix]:
+        logger.warning("%s cannot be shortened" % predicate)
+        return predicate
+    return u"%s_%s" % (namespacedict[prefix], propertyname)
 
 
-class URIRefField(Field):
-    def to_python(self, value=None):
-        if value:
-            assert not isinstance(value, rdflib.Literal)
-            assert isinstance(value, (rdflib.URIRef,
-                rdflib.BNode)), "please pass uriref!"
-            #value = rdflib.URIRef(unicode(value))
-        else:
-            value = rdflib.URIRef(u'')
-        return value
-class ObjectField(Field):
-    def to_python(self, value=None):
-        return value
+def pyattr2predicate(pyattr, namespacedict):
+    # TODO: build urirefdict instead of unicodedict?
 
+    if pyattr.startswith(u"http://"):
+        return rdflib.URIRef(pyattr)
+
+    splitlist = pyattr.split("_")
+
+    # HACK: are there constrains for namespace prefixes?
+    if len(splitlist) > 2 and u"_".join(splitlist[0:2]) in namespacedict:
+        # http://www.geonames.org/ontology# defines 'wgs84_pos' --> \
+        # 'wgs84_pos_lat' cannot be solved with approach we took until now
+        prefix = u"_".join(splitlist[0:2])
+        property_name = u"_".join(splitlist[2:])
+    else:
+        prefix = splitlist[0]
+        property_name = u"_".join(splitlist[1:])
+
+    assert prefix, pyattr
+    assert property_name, pyattr
+    assert namespacedict[prefix], pyattr
+    return rdflib.URIRef(u"%s%s" % (namespacedict[prefix], property_name))
+
+
+def check_shortcut_consistency():
+    """Checks every known Origin for inconsistent namespacemappings"""
+    global_namespace_dict = {}
+    for origin in Origin.objects.all():
+        if hasattr(origin, "_graph"):
+            for k, v in dict(origin._graph.namespace_manager\
+                        .namespaces()).items():
+                print k,v
+                if k in global_namespace_dict:
+                    assert global_namespace_dict[k] == v
+                else:
+                    global_namespace_dict[k] = v
+
+
+# TODO: this is just for convenience --> remove once stable
+def my_graph_diff(graph1, graph2):
+    """Compares graph2 to graph1 and highlights everything that changed.
+    Colored if pygments available"""
+
+    import difflib
+
+    # quick fix for wrong type
+    if not type(graph1) == type(graph2) == rdflib.Graph:
+        if type(graph1) == rdflib.ConjunctiveGraph:
+            g1contexts = list(graph1.contexts())
+            assert len(g1contexts) == 1
+            graph1 = g1contexts[0]
+        if type(graph2) == rdflib.ConjunctiveGraph:
+            g2contexts = list(graph2.contexts())
+            assert len(g2contexts) == 1
+            graph2 = g2contexts[0]
+
+
+    # Return if both graphs are isomorphic
+    iso1 = compare.to_isomorphic(graph1)
+    iso2 = compare.to_isomorphic(graph2)
+
+    if graph1.identifier == graph2.identifier:
+        str_bit = u"The 2 '%s' Graphs" % graph1.identifier
+    else:
+        str_bit = (u"Graphs '%s' and '%s'"
+                   % (graph1.identifier, graph2.identifier))
+
+        # TODO remove later
+        assert not are_isomorphic(graph1, graph2)
+
+    if iso1 == iso2:
+        logger.debug(u"%s are isomorphic" % str_bit)
+        return
+
+    print u"Differences between %s." % str_bit
+
+    in_both, in_first, in_second = compare.graph_diff(iso1, iso2)
+
+    def dump_nt_sorted(g):
+        return sorted(g.serialize(format='nt').splitlines())
+
+    sorted_first = dump_nt_sorted(in_first)
+    sorted_second = dump_nt_sorted(in_second)
+
+    diff = difflib.unified_diff(
+        sorted_first,
+        sorted_second,
+        u'Original',
+        u'Current',
+        lineterm=''
+    )
+
+    try:
+        from pygments import highlight
+        from pygments.formatters import terminal
+        from pygments.lexers import web
+
+        lexer = web.XmlLexer()
+        formatter = terminal.TerminalFormatter()
+        print highlight(u'\n'.join(diff), lexer, formatter)
+    except ImportError:
+        logger.info("Install pygments for colored diffs")
+        print u'\n'.join(diff)
+    except UnicodeDecodeError:
+        print u"Only in first", unicode(sorted_first)
+        print u"Only in second", unicode(sorted_second)
+
+
+######### Backends #########
 
 class Backend(object):
     """ Abstract Backend to demonstrate API
@@ -291,6 +391,38 @@ class SimpleMemoryBackend(Backend):
         self.format = format
     def GET(self, uri):
         return self.data
+
+
+
+######### Model definitions #########
+
+class Field(object):
+    def to_db(self, value=None):
+        if value is None:
+            value = ''
+        return value
+    def to_python(self, value=None):
+        return value
+
+
+class StringField(Field):
+    def to_python(self, value=None):
+        return unicode(value) or u""
+
+
+class URIRefField(Field):
+    def to_python(self, value=None):
+        if value:
+            assert not isinstance(value, rdflib.Literal)
+            assert isinstance(value, (rdflib.URIRef,
+                rdflib.BNode)), "please pass uriref!"
+            #value = rdflib.URIRef(unicode(value))
+        else:
+            value = rdflib.URIRef(u'')
+        return value
+class ObjectField(Field):
+    def to_python(self, value=None):
+        return value
 
 
 class Options(object):
@@ -460,6 +592,8 @@ class Manager(object):
             raise self.model.DoesNotExist
 
 
+######### Resource #########
+
 class ResourceManager(Manager):
 
     def get_pk(self, origin_uri, uri):
@@ -530,50 +664,6 @@ class ResourceManager(Manager):
             return self.get(uri=uri, origin=origin), False
         except self.model.DoesNotExist:
             return self.create(uri=uri, origin=origin), True
-
-
-def reverse_dict(dct):
-    # TODO rdflib.URIRef dict?
-    res = {}
-    for k,v in dct.iteritems():
-        res[v] = k
-    return safe_dict(res)
-
-
-def predicate2pyattr(predicate, namespacedict):
-    prefix, propertyname = split_uri(predicate)
-    assert prefix
-    assert propertyname
-    #if not "_" in propertyname:
-    #    logger.info("%s_%s may cause problems?" % (prefix, propertyname))
-    if not namespacedict[prefix]:
-        logger.warning("%s cannot be shortened" % predicate)
-        return predicate
-    return u"%s_%s" % (namespacedict[prefix], propertyname)
-
-
-def pyattr2predicate(pyattr, namespacedict):
-    # TODO: build urirefdict instead of unicodedict?
-
-    if pyattr.startswith(u"http://"):
-        return rdflib.URIRef(pyattr)
-
-    splitlist = pyattr.split("_")
-
-    # HACK: are there constrains for namespace prefixes?
-    if len(splitlist) > 2 and u"_".join(splitlist[0:2]) in namespacedict:
-        # http://www.geonames.org/ontology# defines 'wgs84_pos' --> \
-        # 'wgs84_pos_lat' cannot be solved with approach we took until now
-        prefix = u"_".join(splitlist[0:2])
-        property_name = u"_".join(splitlist[2:])
-    else:
-        prefix = splitlist[0]
-        property_name = u"_".join(splitlist[1:])
-
-    assert prefix, pyattr
-    assert property_name, pyattr
-    assert namespacedict[prefix], pyattr
-    return rdflib.URIRef(u"%s%s" % (namespacedict[prefix], property_name))
 
 
 class Resource(Model):
@@ -729,6 +819,8 @@ class Resource(Model):
         self._origin.PUT()
         self._has_changes = False
 
+
+######### Origin #########
 
 class OriginManager(Manager):
 
@@ -1051,85 +1143,3 @@ class Origin(Model):
             return
         self.backend.PUT(graph=self.graph())
         # TODO OK
-
-def check_shortcut_consistency():
-    """Checks every known Origin for inconsistent namespacemappings"""
-    global_namespace_dict = {}
-    for origin in Origin.objects.all():
-        if hasattr(origin, "_graph"):
-            for k, v in dict(origin._graph.namespace_manager\
-                        .namespaces()).items():
-                print k,v
-                if k in global_namespace_dict:
-                    assert global_namespace_dict[k] == v
-                else:
-                    global_namespace_dict[k] = v
-
-# TODO: this is just for convenience --> remove once stable
-def my_graph_diff(graph1, graph2):
-    """Compares graph2 to graph1 and highlights everything that changed.
-    Colored if pygments available"""
-
-    import difflib
-
-    # quick fix for wrong type
-    if not type(graph1) == type(graph2) == rdflib.Graph:
-        if type(graph1) == rdflib.ConjunctiveGraph:
-            g1contexts = list(graph1.contexts())
-            assert len(g1contexts) == 1
-            graph1 = g1contexts[0]
-        if type(graph2) == rdflib.ConjunctiveGraph:
-            g2contexts = list(graph2.contexts())
-            assert len(g2contexts) == 1
-            graph2 = g2contexts[0]
-
-
-    # Return if both graphs are isomorphic
-    iso1 = compare.to_isomorphic(graph1)
-    iso2 = compare.to_isomorphic(graph2)
-
-    if graph1.identifier == graph2.identifier:
-        str_bit = u"The 2 '%s' Graphs" % graph1.identifier
-    else:
-        str_bit = (u"Graphs '%s' and '%s'"
-                   % (graph1.identifier, graph2.identifier))
-
-        # TODO remove later
-        assert not are_isomorphic(graph1, graph2)
-
-    if iso1 == iso2:
-        logger.debug(u"%s are isomorphic" % str_bit)
-        return
-
-    print u"Differences between %s." % str_bit
-
-    in_both, in_first, in_second = compare.graph_diff(iso1, iso2)
-
-    def dump_nt_sorted(g):
-        return sorted(g.serialize(format='nt').splitlines())
-
-    sorted_first = dump_nt_sorted(in_first)
-    sorted_second = dump_nt_sorted(in_second)
-
-    diff = difflib.unified_diff(
-        sorted_first,
-        sorted_second,
-        u'Original',
-        u'Current',
-        lineterm=''
-    )
-
-    try:
-        from pygments import highlight
-        from pygments.formatters import terminal
-        from pygments.lexers import web
-
-        lexer = web.XmlLexer()
-        formatter = terminal.TerminalFormatter()
-        print highlight(u'\n'.join(diff), lexer, formatter)
-    except ImportError:
-        logger.info("Install pygments for colored diffs")
-        print u'\n'.join(diff)
-    except UnicodeDecodeError:
-        print u"Only in first", unicode(sorted_first)
-        print u"Only in second", unicode(sorted_second)
