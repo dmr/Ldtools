@@ -19,6 +19,9 @@ from xml.sax._exceptions import SAXParseException
 # TODO: find a better way to set socket timeout
 socket.setdefaulttimeout(5)
 
+# add n3 to known mimetypes
+mimetypes.add_type("text/n3", ".n3")
+
 logger = logging.getLogger(__name__)
 
 
