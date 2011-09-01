@@ -1,6 +1,8 @@
+# -*- coding: utf-8 -*-
+__version__ = "0.4.3"
+
 import os
 from setuptools import setup, find_packages
-from ldtools import __version__
 
 setup(
     name='Ldtools',
