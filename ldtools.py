@@ -252,13 +252,12 @@ class SingleFileBackend(Backend):
     flexible!
     """
 
-    def __init__(self, filename, format="xml"):
-        # TODO: filename already contains ".xml" --> read from there
-        # TODO: make filename optional and calculate
+    def __init__(self, filename, format=None):
         assert os.path.exists(filename)
         self.filename = filename
+
         # TODO: assert format in rdflib.parserplugins
-        self.format = format
+        self.format = format if format else self.filename.split(".")[-1]
 
     def GET(self, uri):
         if not hasattr(self, "uri"):
