@@ -6,41 +6,30 @@ import unittest2
 from rdflib import compare
 
 
-class TestOriginGET(unittest2.TestCase):
+class OriginGETAndPUT(unittest2.TestCase):
     def setUp(self):
         ldtools.Origin.objects.reset_store()
         ldtools.Resource.objects.reset_store()
 
-        #uri = "http://example.org/sample"
-        uri = "http://xmlns.com/foaf/0.1/"
-        #uri = "http://www.w3.org/People/Berners-Lee/card"
-
         filename = "www_w3_org__People__Berners-Lee__card.xml"
         file_name = os.path.join(os.path.dirname(__file__), filename)
         backend = ldtools.SingleFileBackend(file_name)
+
+        uri = "http://xmlns.com/foaf/0.1/"
+        #uri = "http://www.w3.org/People/Berners-Lee/card"
+
         self.origin1 = ldtools.Origin.objects.create(uri, BACKEND=backend)
         self.origin1.GET()
 
-        #for r in ldtools.Resource.objects.all():
-        #    print
-        #    pprint.pprint(r.__dict__)
-        #    print
-        #<PersonalProfileDocument rdf:about="">
-        #    <cc:license rdf:resource="http://creativecommons.org/licenses/by-nc/3.0/"/>
-        #    <dc:title>Tim Berners-Lee's FOAF file</dc:title>
-
         self.resource1 = ldtools.Resource.objects.get(
             uri="http://xmlns.com/foaf/0.1/PersonalProfileDocument",
-            origin=self.origin1
-        )
+            origin=self.origin1)
 
         results = list(ldtools.Resource.objects.filter(_origin=self.origin1,
             rdf_type=self.resource1))
 
         for result in results:
             self.assertEqual(result.rdf_type, self.resource1)
-            import pprint
-            pprint.pprint(result.__dict__)
 
         self.assertEqual(results[0].dc_title,
              rdflib.Literal(u"Tim Berners-Lee's editable FOAF file"))
@@ -57,6 +46,7 @@ class TestOriginGET(unittest2.TestCase):
 
     def tearDown(self):
         self.resource2._origin.backend.revert_to_old_version()
+
 
 if __name__ == '__main__':
     unittest2.main()

@@ -5,9 +5,11 @@ __useragent__ = ('ldtools-%s (http://github.com/dmr/ldtools, daniel@nwebs.de)'
                  % __version__)
 
 import datetime
+import logging
 import mimetypes
 import os
 import rdflib
+import socket;
 import shutil
 import urllib2
 from rdflib.namespace import split_uri
@@ -15,10 +17,9 @@ from rdflib import compare
 from urlparse import urlparse
 from xml.sax._exceptions import SAXParseException
 
-import socket;
-socket.setdefaulttimeout(5) # HACK, TODO: find a way to set this for request
+# TODO: find a better way to set socket timeout
+socket.setdefaulttimeout(5)
 
-import logging
 logger = logging.getLogger(__name__)
 
 
@@ -140,7 +141,6 @@ class ObjectField(Field):
         return value
 
 
-
 class Backend(object):
     """ Abstract Backend to demonstrate API
     """
@@ -227,7 +227,6 @@ class RestBackend(Backend):
 
         self.format = content_type
 
-        # TODO: maybe 'pretty-xml'?
         data = graph.serialize(format=self.format)
 
         # TODO: authentication? oauth?
@@ -370,11 +369,13 @@ class Model(object):
 
     def __init__(self, pk=None, **kwargs):
         self.pk = pk
-        for attrname, field in self._meta.fields.iteritems():
-            attr = kwargs.pop(attrname)
+        for attr_name, field in self._meta.fields.iteritems():
+            attr = kwargs.pop(attr_name)
             value = field.to_python(attr)
-            setattr(self, attrname, value)
+            setattr(self, attr_name, value)
         if kwargs:
+            # TODO ValueError is raised on object creation with kwargs.
+            # inconsistent: after that, no checks performed.
             raise ValueError('%s are not part of the schema for %s'
                 % (', '.join(kwargs.keys()), self.__class__.__name__))
 
@@ -384,9 +385,6 @@ class Model(object):
 
         if set(other.__dict__.keys()) != set(self.__dict__.keys()):
             return False
-
-        #if set(self.__dict__.keys()) - set(other.__dict__.keys()):
-        #    return False
 
         for key in self.__dict__.keys():
             if (not hasattr(other, key) or
@@ -453,11 +451,11 @@ class Manager(object):
 
     def filter(self, **kwargs):
         def check_if_equals_or_in_set((key, value)):
+            """helper method for loop. Convenient but maybe hacky: checks
+            if value is in attr or if iterable inside the iterable"""
             if hasattr(item, key):
                 items_value = getattr(item, key)
-                # TODO: inconsistent: can handle lists and strings!!!
-                # convenient but ugly
-                if type(items_value) in (set, list):
+                if hasattr(items_value, "__iter__"):
                     if value in items_value:
                         return True
                 else:
@@ -465,10 +463,8 @@ class Manager(object):
                         return True
             return False
 
-        # TODO: this is ugly but it works ;-)
         for item in self.all():
             if all(map(check_if_equals_or_in_set, kwargs.items())):
-                #logger.info("Found %s in %s" % (kwargs.items(), item))
                 yield item
 
     def create(self, pk, **kwargs):
@@ -487,10 +483,10 @@ class Manager(object):
 
 class ResourceManager(Manager):
 
-    def get_pk(self, uri1, uri2):
-        return uri1+uri2
+    def get_pk(self, origin_uri, uri):
+        return origin_uri+uri
 
-    def create(self, uri, origin):
+    def create(self, uri, origin, **kwargs):
         assert isinstance(origin, Origin), "Origin instance required"
 
         if uri.startswith("#"):
@@ -499,7 +495,7 @@ class ResourceManager(Manager):
             uri = rdflib.URIRef(origin.uri + uri)
 
         uri = canonalize_uri(uri)
-        pk = self.get_pk(origin.uri, uri)
+        pk = self.get_pk(origin_uri=origin.uri, uri=uri)
         if isinstance(uri, rdflib.BNode):
             obj = super(ResourceManager, self).create(pk=pk, _uri=uri,
                                                       _origin=origin)
@@ -538,7 +534,7 @@ class ResourceManager(Manager):
 
 
         assert isinstance(origin, Origin), origin
-        pk = self.get_pk(origin.uri, uri)
+        pk = self.get_pk(origin_uri=origin.uri, uri=uri)
         return super(ResourceManager, self).get(pk=pk)
         assert 0, "implement!"
 
@@ -562,7 +558,7 @@ def reverse_dict(dct):
     for k,v in dct.iteritems():
         res[v] = k
     return safe_dict(res)
-    
+
 
 def predicate2pyattr(predicate, namespacedict):
     prefix, propertyname = split_uri(predicate)
@@ -574,6 +570,7 @@ def predicate2pyattr(predicate, namespacedict):
         logger.warning("%s cannot be shortened" % predicate)
         return predicate
     return u"%s_%s" % (namespacedict[prefix], propertyname)
+
 
 def pyattr2predicate(pyattr, namespacedict):
     # TODO: build urirefdict instead of unicodedict?
@@ -608,7 +605,6 @@ class Resource(Model):
     def _add_property(self, predicate, object):
         assert isinstance(predicate, rdflib.URIRef),\
             "Not an URIRef: %s"%predicate
-        # TODO remove?
         assert hasattr(predicate, "n3"),\
             "property %s is not a rdflib object" % predicate
 
@@ -655,10 +651,12 @@ class Resource(Model):
             attr = getattr(self, predicate)
             #assert attr == object
 
+        # TODO: this might cause UnicodeDecodeErrors
         #logger.debug(u"Contribute_to_object %s: %s = %s"
         #    % (self, predicate.encode('utf8'), attr))
         
-        # --> TODO: force_unicode when reconverting from __dict__?
+        # TODO: introduce rdflib.Literal dict or force_unicode when
+        # reconverting from __dict__?
         assert str(predicate) in self.__dict__
 
     def __unicode__(self):
@@ -670,11 +668,11 @@ class Resource(Model):
             assert isinstance(self._origin, Origin), \
                     "%s" % (getattr(self, "_origin", None))
             str += u" [%r]" % self._origin
-        #if hasattr(self, "rdf_type"): # rdflib.RDF.type):
-        #    rdf_type = list(self.rdf_type)
-        #    #list(getattr(self, rdflib.RDF.type))
-        #    str += (u" rdf:type %s" % unicode(rdf_type[0]))
-        #    if len(rdf_type) > 1: str += u",..."
+        if hasattr(self, "rdf_type"):
+            rdf_type = list(self.rdf_type)
+            str += (u" rdf:type %s" % unicode(rdf_type[0]))
+            if len(rdf_type) > 1:
+                str += u",..."
         return str
 
     def _tripleserialize_iterator(self, namespace_dict):
@@ -711,7 +709,7 @@ class Resource(Model):
             field = self._meta.fields.get(key)
             if field and value:
                 value = field.to_python(value)
-        elif not key.startswith("_") and not key == "pk": # TODO: --> _pk?
+        elif not key.startswith("_") and not key == "pk": # TODO: rename to_pk?
             # rdf properties here
             self._has_changes = True
         Model.__setattr__(self, key, value)
@@ -724,13 +722,29 @@ class Resource(Model):
         self.__class__.objects._storage.__delitem__(self.pk)
 
     def save(self):
+        # TODO: introduce "clean" to make sure only valid properties modified
+        created = not self.pk
+        if created:
+            assert 0, ("Please use Resource.objects.create() to create Resource"
+                       "objects!")
+            #assert not self.__class__.objects.get(self.uri, self.origin)
+            #self = self.__class__.objects.create(**self.get_attributes())
+
+        # TODO: write tests for the following lines
         assert self in Resource.objects.filter(_origin=self._origin)
         assert self in Resource.objects.filter(_origin=self._origin,
             _has_changes=True)
         assert len(list(Resource.objects.filter(_origin=self._origin,
             _has_changes=True))) == 1
+
+        #values = dict((name, getattr(self, name)) for name in \
+        #        self._meta.fields.iterkeys())
+        self.update() #**values)
+
+    def update(self):
         self._origin.PUT()
         self._has_changes = False
+
 
 class OriginManager(Manager):
 
@@ -763,8 +777,7 @@ class OriginManager(Manager):
 
     @catchKeyboardInterrupt
     def GET_all(self, depth=2, **kwargs):
-        """ Crawls or Re-Crawls all Origins.
-        Passes Arguments to GET"""
+        """Crawls or Re-Crawls all Origins. Passes Arguments to GET"""
         # TODO: limit crawling speed
         for _i in range(depth):
             for origin in self.all():
@@ -819,7 +832,6 @@ class Origin(Model):
         assert not self.has_unsaved_changes(), ("Please save all changes "
             "before querying again. Merging not supported yet")
 
-        # http://www.infoq.com/news/2008/04/cool-uris-rest
         if skip_urls is not None and str(self.uri) in skip_urls:
             self.add_error("Skipped")
             self.processed = True
@@ -939,7 +951,7 @@ class Origin(Model):
         parsing plugins
         """
         # TODO: rdflib.graph() ?
-        g = rdflib.graph.ConjunctiveGraph(identifier=self.uri)
+        graph = rdflib.graph.ConjunctiveGraph(identifier=self.uri)
 
         if not hasattr(self, '_graph'):
             if len(self.errors) == 0:
@@ -947,7 +959,7 @@ class Origin(Model):
             else:
                 logging.error("Origin %s has Errors --> can't process .graph()"
                     % self.uri)
-                return g
+                return graph
 
         # TODO: find a better way to do this
         # Problems:
@@ -958,15 +970,14 @@ class Origin(Model):
         namespaces = dict(self._graph.namespace_manager\
                             .namespaces())
         for prefix, namespace in safe_dict(namespaces).items():
-            g.bind(prefix=prefix, namespace=namespace)
-        new_ns = dict(g.namespace_manager.namespaces())
+            graph.bind(prefix=prefix, namespace=namespace)
+        new_ns = dict(graph.namespace_manager.namespaces())
 
         assert namespaces == new_ns, [(k, v) for k, v in
                   safe_dict(namespaces)\
-                  .items() if  not k in safe_dict(new_ns).keys()]
+                  .items() if not k in safe_dict(new_ns).keys()]
 
         for resource in self.get_resources():
-
             # TODO: better idea how to do this?
             # __dict__ converts rdflib.urirefs to strings -->
             # converts back to uriref
@@ -974,8 +985,8 @@ class Origin(Model):
             namespace_dict = dict(self._graph.namespace_manager.namespaces())
 
             for triple in resource._tripleserialize_iterator(namespace_dict):
-                g.add(triple)
-        return g
+                graph.add(triple)
+        return graph
 
     def handle_graph(self, follow_uris, handle_owl_imports):
         assert hasattr(self, '_graph')
@@ -1057,7 +1068,7 @@ class Origin(Model):
             logging.error("Nothing to PUT for %s!" % self.uri)
             return
         self.backend.PUT(graph=self.graph())
-        # TODO return?
+        # TODO OK
 
 def check_shortcut_consistency():
     """Checks every known Origin for inconsistent namespacemappings"""
