@@ -694,6 +694,15 @@ class Resource(Model):
     _origin = ObjectField()
     objects = ResourceManager()
 
+    def __unicode__(self):
+        str = u"%s" % self._uri
+        if hasattr(self, 'foaf_name'):
+            str += u' "%s"' % unicode(self.foaf_name)
+            if len(self.foaf_name) > 1: str += u",..."
+        if hasattr(self, "_origin") and isinstance(self._origin, Origin):
+            str += u" [%r]" % self._origin.uri.encode("utf8")
+        return str
+
     def get_attributes(self):
         dct = copy.copy(self.__dict__)
         for attr in [u"pk",
@@ -761,15 +770,6 @@ class Resource(Model):
         # TODO: introduce rdflib.Literal dict or force_unicode when
         # reconverting from __dict__?
         assert str(predicate) in self.__dict__
-
-    def __unicode__(self):
-        str = u"%s" % self._uri
-        if hasattr(self, 'foaf_name'):
-            str += u' "%s"' % unicode(self.foaf_name)
-            if len(self.foaf_name) > 1: str += u",..."
-        if hasattr(self, "_origin") and isinstance(self._origin, Origin):
-            str += u" [%r]" % self._origin.uri.encode("utf8")
-        return str
 
     def _tripleserialize_iterator(self, namespace_dict):
         for property, values in self.__dict__.items():
@@ -848,8 +848,8 @@ class OriginManager(Manager):
 
     def create_hook(self, uri):
         assert not '#' in uri, ("HashURI not allowed as Origin: %s. Maybe "
-            "Resource.objects.create(...,auto_origin=True) is what you are "
-            "looking for." % uri)
+            "you are looking for "
+            "Resource.objects.get_or_create(...,auto_origin=True)?" % uri)
 
     def create(self, uri, BACKEND=None):
         uri = canonalize_uri(uri)
@@ -1072,7 +1072,7 @@ class Origin(Model):
 
         if not hasattr(self, '_graph'):
             if len(self.errors) == 0:
-                self.GET() # TODO: test for recursion?
+                self.GET(raise_errors=False) # TODO: test for recursion?
             else:
                 logging.error("Origin %s has Errors --> can't process .graph()"
                     % self.uri)
@@ -1180,9 +1180,13 @@ class Origin(Model):
         return False
 
     def PUT(self):
-        assert hasattr(self, "_graph")
+        assert self.processed
+        if hasattr(self, "errors"):
+            assert not self.errors, ("There were errors fetching the "
+                                     "resource. PUT not possible")
+
         if not self.has_unsaved_changes():
             logging.error("Nothing to PUT for %s!" % self.uri)
             return
         self.backend.PUT(graph=self.graph())
-        # TODO OK
+        # TODO return "OK"
