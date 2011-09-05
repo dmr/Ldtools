@@ -641,7 +641,10 @@ class ResourceManager(Manager):
 
         assert not hasattr(obj, "_has_changes")
 
-    def get(self, uri, origin=None):
+        return obj
+
+
+    def get(self, uri, origin=None, return_authoritative_resource=True):
         """If the authoratative Origin to the Resource does not exist and no
         origin is given then DoesNotExist is returned. Assumption is
         to only trust validated sources.
@@ -654,20 +657,34 @@ class ResourceManager(Manager):
         """
         uri = canonalize_uri(uri)
 
-        # TODO: make origin optional? explicit > implicit --> no. but still
-        # convenient...
-        if not origin: # TODO: make guessing origin explicit in get()
+        if not origin:
             filter_result = list(self.filter(_uri=uri))
 
             if not filter_result:
                 raise self.model.DoesNotExist
 
-            assert len(filter_result) == 1, ("Please pass the exact "
-                "Origin. The Resource you are looking for is provided by: %s"
-                % ", ".join([r._origin for r in filter_result]))
-
-            return filter_result[0]
-
+            if len(filter_result) == 1:
+                # return only match
+                return filter_result[0]
+            else:
+                if return_authoritative_resource:
+                    # try to return best match
+                    authoritative_resource = None
+                    for resource in filter_result:
+                        if uri.startswith(resource._origin.uri):
+                            authoritative_resource = resource
+                            break
+                    if authoritative_resource:
+                        return authoritative_resource
+                    else:
+                        raise self.model.DoesNotExist("No authoritative "
+                            "Resource found for %s" %uri)
+                else:
+                    raise self.model.DoesNotExist("Please pass the exact "
+                        "Origin. The Resource you are looking for is "
+                        "provided by the Origins: %s"
+                        % ", ".join([unicode(r._origin.uri)
+                                     for r in filter_result]))
 
         assert isinstance(origin, Origin), origin
         pk = self.get_pk(origin_uri=origin.uri, uri=uri)
@@ -828,10 +845,13 @@ class Resource(Model):
 
         # TODO: write tests for the following lines
         assert self in Resource.objects.filter(_origin=self._origin)
-        assert self in Resource.objects.filter(_origin=self._origin,
-            _has_changes=True)
-        assert len(list(Resource.objects.filter(_origin=self._origin,
-            _has_changes=True))) == 1
+
+        if self in Resource.objects.filter(_origin=self._origin,
+                _has_changes=True):
+            assert len(list(Resource.objects.filter(_origin=self._origin,
+                _has_changes=True))) == 1
+        else:
+            logging.info("New resource object was created")
 
         #values = dict((name, getattr(self, name)) for name in \
         #        self._meta.fields.iterkeys())
