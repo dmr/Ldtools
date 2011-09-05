@@ -310,6 +310,14 @@ class RestBackend(Backend):
             self.format = "xml"
             self.content_type = mimetypes.types_map[".%s" % self.format]
 
+        # TODO: double check if parser for format exists -->
+        # TODO: move parser to backend
+        try:
+            rdflib.graph.plugin.get(name=self.format, kind=rdflib.parser.Parser)
+        except rdflib.plugin.PluginException as e:
+            logger.error("Parser does not exist for format %s" % self.format)
+            self.format = "xml"
+
         content = result_file.read()
         return content
 
