@@ -622,15 +622,16 @@ class ResourceManager(Manager):
 
         uri = canonalize_uri(uri)
         pk = self.get_pk(origin_uri=origin.uri, uri=uri)
-        if isinstance(uri, rdflib.BNode):
-            obj = super(ResourceManager, self).create(pk=pk, _uri=uri,
-                                                      _origin=origin)
-            assert isinstance(obj._uri, rdflib.BNode)
-            assert not hasattr(obj, "_has_changes")
-            return obj
 
-        return super(ResourceManager, self).create(pk=pk, _uri=uri,
-                                                   _origin=origin, **kwargs)
+        obj = super(ResourceManager, self).create(
+            pk=pk, _uri=uri, _origin=origin, **kwargs
+        )
+
+        # move to tests
+        if isinstance(uri, rdflib.BNode):
+            assert isinstance(obj._uri, rdflib.BNode)
+
+        assert not hasattr(obj, "_has_changes")
 
     def get(self, uri, origin=None):
         """If the authoratative Origin to the Resource does not exist and no
