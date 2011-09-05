@@ -26,7 +26,12 @@ setup(
         'Programming Language :: Python',
         'License :: OSI Approved :: BSD License',
     ],
-    install_requires=['rdflib'],
-    tests_require=['nose'],
+    install_requires=[
+        "rdflib",
+    ],
+    tests_require=[
+        "nose",
+        "unittest2",
+    ],
     test_suite='nose.collector',
 )
