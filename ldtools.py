@@ -128,7 +128,7 @@ def predicate2pyattr(predicate, namespacedict):
     assert propertyname
     #if not "_" in propertyname:
     #    logger.info("%s_%s may cause problems?" % (prefix, propertyname))
-    if not namespacedict[prefix]:
+    if not prefix in namespacedict:
         logger.warning("%s cannot be shortened" % predicate)
         return predicate
     return u"%s_%s" % (namespacedict[prefix], propertyname)
