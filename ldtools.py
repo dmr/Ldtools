@@ -899,16 +899,17 @@ class OriginManager(Manager):
         # TODO: limit crawling speed
         for _i in range(depth):
             for origin in self.all():
-                origin.GET(**kwargs)
+                origin.GET(raise_errors=False, **kwargs)
 
     @catchKeyboardInterrupt
     def GET_uncrawled(self, depth=2, **kwargs):
+        # TODO: not self.processed? _graph recrawls uris with errors
         func = lambda origin: True if not hasattr(origin, "_graph") else False
         for _i in range(depth):
             crawl = filter(func, self.all())
             if crawl:
                 for origin in crawl:
-                    origin.GET(**kwargs)
+                    origin.GET(raise_errors=False, **kwargs)
 
 
 class Origin(Model):
@@ -924,6 +925,7 @@ class Origin(Model):
     def __init__(self, pk=None, **kwargs):
         super(Origin, self).__init__(pk=pk, **kwargs)
         self.stats = {}
+        self.processed = False
 
     def __unicode__(self):
         str = u"%s" % unicode(self.uri)
@@ -931,7 +933,7 @@ class Origin(Model):
         if hasattr(self, 'errors'):
             for error in self.errors:
                 str += u" %s" % error
-        if hasattr(self, 'processed'):
+        if self.processed:
             str += u" Processed"
         return str
 
@@ -948,8 +950,13 @@ class Origin(Model):
 
         logger.info(u"GET %s..." % self.uri)
 
-        assert not self.has_unsaved_changes(), ("Please save all changes "
-            "before querying again. Merging not supported yet")
+        if self.has_unsaved_changes():
+            if self.processed:
+                raise Exception("Please save all changes before querying "
+                                "again. Merging not supported yet")
+            else:
+                logger.warning("There were Resource objects created before "
+                               "processing the resource's origin.")
 
         if skip_urls is not None and str(self.uri) in skip_urls:
             self.add_error("Skipped")
@@ -1195,8 +1202,17 @@ class Origin(Model):
         self.handled = True
 
     def has_unsaved_changes(self):
-        if any(resource._has_changes for resource in self.get_resources()\
-               if hasattr(resource, '_has_changes')): return True
+
+        # resource objects exist although not processed yet
+        if not self.processed and len(list(self.get_resources())):
+            return True
+
+        # objects with changed attributes exist
+        if any(resource._has_changes
+                for resource in self.get_resources()\
+                    if hasattr(resource, '_has_changes')):
+            return True
+
         return False
 
     def PUT(self):
