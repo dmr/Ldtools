@@ -622,6 +622,8 @@ class ResourceManager(Manager):
 
     def create(self, uri, origin, **kwargs):
         assert isinstance(origin, Origin), "Origin instance required"
+        #assert origin.processed, ("Origin has to be processed before creating "
+        #    "more Resource objects: origin.GET()")
 
         if uri.startswith("#"):
             assert not isinstance(uri, rdflib.BNode), \
