@@ -396,12 +396,15 @@ class SingleFileBackend(Backend):
 
 
 class SimpleMemoryBackend(Backend):
-    def __init__(self, data, format="xml"):
-        self.data = data
+    def __init__(self, data=None, format="xml"):
+        self.data = data if data else ""
         self.format = format
+
     def GET(self, uri):
         return self.data
 
+    def PUT(self, graph):
+        self.data = graph.serialize(format=self.format)
 
 
 ######### Model definitions #########
