@@ -287,7 +287,17 @@ class RestBackend(Backend):
         opener = urllib2.build_opener() #SmartRedirectHandler())
         result_file = opener.open(request)
 
-        self.content_type = result_file.headers['Content-Type'].strip(";")
+        self.content_type = result_file.headers['Content-Type'].split(";")[0]
+
+        # Many servers don't do content negotiation: if one of the following
+        # content_types are returned by server, assume the mapped type
+        content_type_mapping = {
+            "text/plain": "application/rdf+xml"
+        }
+
+        if self.content_type in content_type_mapping:
+            self.content_type = content_type_mapping[self.content_type]
+
         file_extension = mimetypes.guess_extension(self.content_type)
         if file_extension:
             format = file_extension.strip(".")
