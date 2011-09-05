@@ -907,11 +907,16 @@ class Origin(Model):
         return str
 
     def GET(self,
-            GRAPH_SIZE_LIMIT=25000,
+            GRAPH_SIZE_LIMIT=30000,
             follow_uris=None,
             handle_owl_imports=False,
-            skip_urls=None
+            skip_urls=None,
+            raise_errors=True,
             ):
+
+        if not self.uri:
+            raise Exception("Please provide URI first")
+
         logger.info(u"GET %s..." % self.uri)
 
         assert not self.has_unsaved_changes(), ("Please save all changes "
@@ -928,19 +933,19 @@ class Origin(Model):
             data = self.backend.GET(self.uri)
         except urllib2.HTTPError as e:
             if e.code in [
-                401,
-
-                403,
-                503, # Service Temporarily Unavailable
-                404, # Not Found
-                ]:
+                    401,
+                    403,
+                    503, # Service Temporarily Unavailable
+                    404, # Not Found
+                    ]:
                 self.add_error(e.code)
-                return
-            else:
-                raise
+            if raise_errors: raise e
+            else: return
         except urllib2.URLError as e:
             self.add_error("timeout")
-            return
+            if raise_errors: raise e
+            else: return
+
         assert self.backend.format, "format is needed later"
 
         if not data:
@@ -958,27 +963,37 @@ class Origin(Model):
         except SAXParseException:
             self.add_error("SAXParseException")
             logger.error("SAXParseException: %s" % self)
-            raise
+            print data
+            if raise_errors: raise e
+            else: return
         except rdflib.exceptions.ParserError:
             self.add_error("ParserError")
             logger.error("ParserError: %s" % self)
+            if raise_errors: raise e
+            else: return
         except IOError as e:
             # TODO: why does this occur? guess: wrong protocol
             self.add_error("IOError")
             logger.error("IOError: %s" % self)
+            if raise_errors: raise e
+            else: return
 
+        self.processed = True
         if not graph:
-            self.processed = True
+            logger.warning("%s did not return any information" % self.uri)
             return
 
-        if hasattr(self, "errors"):
-            delattr(self, "errors")
+        if hasattr(self, "errors"): delattr(self, "errors")
 
         g_length = len(graph)
-        if g_length > 3000:
+        if g_length > 5000:
             logger.warning("len(graph) == %s" % g_length)
             if g_length > GRAPH_SIZE_LIMIT:
-                logger.error("Nope."); return
+                logger.error("Maximum graph size is set to %s. The aquired "
+                             "graph exceeds that! Pass "
+                             "GRAPH_SIZE_LIMIT to set it differently."
+                             % GRAPH_SIZE_LIMIT);
+                return
 
         # normal rdflib.compare does not work correctly with
         # conjunctiveGraph, unless there is only one graph within that
@@ -1018,16 +1033,22 @@ class Origin(Model):
 
         if hasattr(self, '_graph'):
             triples = len(self._graph)
-            tps = triples_per_second(triples, self.stats['graph_processing_time'])
+            tps = triples_per_second(triples,
+                                     self.stats['graph_processing_time'])
             if tps:
                 logger.info(
                     "Crawled %s: '%s' triples in '%s' seconds --> '%s' "
-                    "triples/second" % (self.uri, triples,
-                                        self.stats['graph_processing_time'], tps))
+                    "triples/second"
+                    % (self.uri, triples,
+                       self.stats['graph_processing_time'], tps))
             else:
                 logger.info("Crawled %s in '%s' seconds"
                 % (self.uri, self.stats['graph_processing_time']))
             pass
+
+        # TODO: remove self.processed?
+        self.processed = True
+
 
     def get_resources(self):
         return Resource.objects.filter(_origin=self)
