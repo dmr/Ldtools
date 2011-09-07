@@ -4,11 +4,7 @@ __version__ = "0.4.4"
 import os
 from setuptools import setup, find_packages
 
-def read_file(file_name):
-    file_name = os.path.join(os.path.dirname(__file__), file_name)
-    with open(file_name, "r") as f:
-        content = f.read()
-    return content
+README = open(os.path.join(os.path.dirname(__file__), "README.rst")).read()
 
 setup(
     name='Ldtools',
@@ -18,7 +14,7 @@ setup(
     author='Daniel Rech',
     author_email='daniel@nwebs.de',
     description='A lightweight orm for Linked Data',
-    long_description=read_file("README.rst"),
+    long_description=README,
     packages=find_packages(),
 
     install_requires=["rdflib"],
