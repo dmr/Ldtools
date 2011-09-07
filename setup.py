@@ -4,6 +4,12 @@ __version__ = "0.4.3"
 import os
 from setuptools import setup, find_packages
 
+def read_file(file_name):
+    file_name = os.path.join(os.path.dirname(__file__), file_name)
+    with open(file_name, "r") as f:
+        content = f.read()
+    return content
+
 setup(
     name='Ldtools',
     version=__version__,
@@ -12,12 +18,16 @@ setup(
     author='Daniel Rech',
     author_email='daniel@nwebs.de',
     description='A lightweight orm for Linked Data',
-    long_description=("Ldtools provides a usable API for RDF data. Different "
-        "backends can either publish local data on the web or use data from "
-        "the web within your application."),
-    py_modules=['ldtools'],
-    zip_safe=False,
-    platforms='any',
+    long_description=read_file("README.rst"),
+    packages=find_packages(),
+
+    install_requires=["rdflib"],
+
+    extras_require={
+        'tests': ["nose", "unittest2",],
+    },
+    test_suite='nose.collector',
+
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Web Environment',
@@ -26,12 +36,4 @@ setup(
         'Programming Language :: Python',
         'License :: OSI Approved :: BSD License',
     ],
-    install_requires=[
-        "rdflib",
-    ],
-    tests_require=[
-        "nose",
-        "unittest2",
-    ],
-    test_suite='nose.collector',
 )

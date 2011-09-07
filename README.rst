@@ -1,5 +1,11 @@
-ldtools
--------
+Ldtools
+~~~~~~~
+
+Ldtools is a simple library to handle RDF data more conveniently..
+
+
+Features
+========
 
 * A lightweight "ORM" to handle Linked Data Resources and their Origins
 * Written in python
@@ -11,7 +17,7 @@ ldtools
 
 
 How to use it?
---------------
+==============
 
 First, we create a Resource object (this will create an Origin object):
 
