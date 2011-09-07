@@ -10,17 +10,18 @@ class TestUrlparse(unittest2.TestCase):
     def test_hash1(self):
         uri = "www.cwi.nl:80/%7Eguido/Python.html"
         o = urlparse.urlparse(uri)
-        assert not o.fragment
+        self.assert_(not o.fragment)
 
     def test_hash2(self):
-        uri = "www.cwi.nl:80/%7Eguido/Python.html#bla"
+        uri = "www.cwi.nl:80/%7Eguido/Python.html#fragm"
         o = urlparse.urlparse(uri)
-        assert o.fragment == "bla"
+        self.assertEqual(o.fragment, "fragm", o.fragment)
 
     def test_hash3(self):
         uri = "www.cwi.nl:80/%7Eguido/Python.html#bla"
         r = urlparse.urlsplit(uri)
-        assert r.geturl() == "www.cwi.nl:80/%7Eguido/Python.html#bla"
+        self.assertEqual(r.geturl(), "www.cwi.nl:80/%7Eguido/Python.html#bla",
+            r.geturl())
 
 
 class TestCanonalizeUri(unittest2.TestCase):
