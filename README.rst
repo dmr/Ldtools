@@ -26,7 +26,7 @@ Process it, hopefully discovering more Origins in there (rdfs:seeAlso, owl:sameA
 
     import rdflib
 
-    r._origin.GET(follow_uris=[rdflib.OWL.sameAs])
+    r._origin.GET(only_follow_uris=[rdflib.OWL.sameAs])
 
 
     import pprint
