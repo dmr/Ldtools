@@ -532,11 +532,11 @@ class Origin(Model):
             if raise_errors: raise e
             else: return
 
-        assert self.backend.format, "format is needed later"
-
         if not data:
             self.processed = True
             return
+
+        assert self.backend.format, "format is needed later"
 
         graph = rdflib.graph.ConjunctiveGraph(identifier=self.uri)
 
@@ -549,7 +549,6 @@ class Origin(Model):
         except SAXParseException:
             self.add_error("SAXParseException")
             logger.error("SAXParseException: %s" % self)
-            print data
             if raise_errors: raise e
             else: return
         except rdflib.exceptions.ParserError:
@@ -615,8 +614,6 @@ class Origin(Model):
 
             else:
 
-        # TODO: remove self.processed?
-        self.processed = True
 
 
     def get_resources(self):
@@ -790,9 +787,7 @@ def check_shortcut_consistency():
         if hasattr(origin, "_graph"):
             for k, v in dict(origin._graph.namespace_manager\
                         .namespaces()).items():
-                print k,v
                 if k in global_namespace_dict:
                     assert global_namespace_dict[k] == v
                 else:
                     global_namespace_dict[k] = v
-
