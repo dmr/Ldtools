@@ -30,6 +30,19 @@ def get_file_extension(filename):
     extension = filename.split(".")[1:][-1:]
     return str(extension[0]) if extension else ""
 
+def build_filename_from_uri(uri):
+    file_name = uri.lstrip("http://").replace(".","_")\
+        .replace("/","__").replace("?","___").replace("&","____")
+
+    # TODO: hacky
+    folder = os.path.abspath("cache")
+    if not os.path.exists(folder):
+        os.mkdir(folder)
+
+    return os.path.join(folder, file_name)
+
+
+
 
 class Backend(object):
     """ Abstract Backend to demonstrate API
@@ -38,18 +51,6 @@ class Backend(object):
         raise NotImplementedError
     def PUT(self):
         raise NotImplementedError
-
-    @staticmethod
-    def build_filename_from_uri(uri):
-        file_name = uri.lstrip("http://").replace(".","_")\
-            .replace("/","__").replace("?","___").replace("&","____")
-
-        # TODO: hacky
-        folder = os.path.abspath("cache")
-        if not os.path.exists(folder):
-            os.mkdir(folder)
-
-        return os.path.join(folder, file_name)
 
 
 class RestBackend(Backend):
