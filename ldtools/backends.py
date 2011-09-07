@@ -11,7 +11,7 @@ import urllib2
 # add n3 to known mimetypes
 mimetypes.add_type("text/n3", ".n3")
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("ldtools")
 
 
 def get_file_extension(filename):
@@ -127,7 +127,7 @@ class RestBackend(Backend):
         response = opener.open(request)
 
 
-class SingleFileBackend(Backend):
+class FileBackend(Backend):
     """Manages one xml file --> Uri that the user wants to "PUT" to is not
     flexible!
     """
@@ -186,7 +186,7 @@ class SingleFileBackend(Backend):
             delattr(self, "old_version")
 
 
-class SimpleMemoryBackend(Backend):
+class MemoryBackend(Backend):
     def __init__(self, data=None, format="xml"):
         self.data = data if data else ""
         self.format = format

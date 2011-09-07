@@ -13,7 +13,7 @@ class OriginGETAndPUT(unittest2.TestCase):
 
         filename = "www_w3_org__People__Berners-Lee__card.xml"
         file_name = os.path.join(os.path.dirname(__file__), filename)
-        backend = ldtools.SingleFileBackend(file_name)
+        backend = ldtools.FileBackend(file_name)
 
         uri = "http://xmlns.com/foaf/0.1/"
         #uri = "http://www.w3.org/People/Berners-Lee/card"

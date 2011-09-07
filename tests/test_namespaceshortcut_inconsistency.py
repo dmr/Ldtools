@@ -23,13 +23,13 @@ class TestOriginGET(unittest2.TestCase):
 
     def _scenario_setup(self, foaf_uri1, foaf_uri2):
         data = self.sample_data % foaf_uri1
-        backend = ldtools.SimpleMemoryBackend(data=data)
+        backend = ldtools.MemoryBackend(data=data)
         origin1 = ldtools.Origin.objects.create("http://example.org/sample1",
                                                      BACKEND=backend)
         origin1.GET()
 
         data = self.sample_data % foaf_uri2
-        backend = ldtools.SimpleMemoryBackend(data=data)
+        backend = ldtools.MemoryBackend(data=data)
         origin2 = ldtools.Origin.objects.create("http://example.org/sample2",
                                                      BACKEND=backend)
         origin2.GET()
