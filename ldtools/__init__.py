@@ -612,25 +612,8 @@ class Origin(Model):
                 handle_owl_imports=handle_owl_imports,
             )
 
-        def triples_per_second(triples, time): # TODO make this more accurate
-            total_seconds = (time.microseconds+(time.seconds+\
-                                      time.days*24*3600)*10**6)//10**6
-            return triples / total_seconds if total_seconds > 0 else None
 
-        if hasattr(self, '_graph'):
-            triples = len(self._graph)
-            tps = triples_per_second(triples,
-                                     self.stats['graph_processing_time'])
-            if tps:
-                logger.info(
-                    "Crawled %s: '%s' triples in '%s' seconds --> '%s' "
-                    "triples/second"
-                    % (self.uri, triples,
-                       self.stats['graph_processing_time'], tps))
             else:
-                logger.info("Crawled %s in '%s' seconds"
-                % (self.uri, self.stats['graph_processing_time']))
-            pass
 
         # TODO: remove self.processed?
         self.processed = True
@@ -774,6 +757,29 @@ class Origin(Model):
             return
         self.backend.PUT(graph=self.graph())
         # TODO return "OK"
+
+    def get_statistics(self):
+        def triples_per_second(triples, time): # TODO make this more accurate
+            total_seconds = (time.microseconds+(time.seconds+\
+                                      time.days*24*3600)*10**6)//10**6
+            return triples / total_seconds if total_seconds > 0 else None
+
+        if hasattr(self, '_graph'):
+            triples = len(self._graph)
+            tps = triples_per_second(triples,
+                                     self.stats['graph_processing_time'])
+            if tps:
+                logger.info(
+                    "Crawled %s: '%s' triples in '%s' seconds --> '%s' "
+                    "triples/second"
+                    % (self.uri, triples,
+                       self.stats['graph_processing_time'], tps))
+            else:
+                logger.info("Crawled %s in '%s' seconds"
+                % (self.uri, self.stats['graph_processing_time']))
+            pass
+        else:
+            print "no statistics recorded"
 
 
 
