@@ -30,6 +30,22 @@ def get_file_extension(filename):
     extension = filename.split(".")[1:][-1:]
     return str(extension[0]) if extension else ""
 
+def assure_parser_plugin_exists(format):
+    # TODO: double check if parser for format exists -->
+    # TODO: move parser to backend
+    try:
+        rdflib.graph.plugin.get(name=format,
+                                kind=rdflib.parser.Parser)
+        return True
+    except rdflib.plugin.PluginException as e:
+        logger.error("Parser does not exist for format %s" % format)
+        return False
+
+def guess_format_from_filename(file_name):
+    file_extension = file_name.split(".")[-1]
+    if file_name != file_extension:
+        return file_extension
+
 def build_filename_from_uri(uri):
     file_name = uri.lstrip("http://").replace(".","_")\
         .replace("/","__").replace("?","___").replace("&","____")
@@ -90,25 +106,23 @@ class RestBackend(Backend):
         if file_extension:
             format = file_extension.strip(".")
             if format in ["rdf", "ksh"]:
+                # fix responses that we know are wrong
                 format = "xml"
-            self.format = format
+
+            if assure_parser_plugin_exists(format):
+                self.format = format
+
+                data = result_file.read()
+
+                return data
         else:
-            logger.warning("%s not supported by ldtools. Trying 'xml'..."
-                           % result_file.headers['Content-Type'])
-            self.format = "xml"
-            self.content_type = mimetypes.types_map[".%s" % self.format]
-
-        # TODO: double check if parser for format exists -->
-        # TODO: move parser to backend
-        try:
-            rdflib.graph.plugin.get(name=self.format, kind=rdflib.parser.Parser)
-        except rdflib.plugin.PluginException as e:
-            logger.error("Parser does not exist for format %s" % self.format)
-            self.format = "xml"
-
-        content = result_file.read()
-        return content
-
+            #logger.warning("%s not supported by ldtools. Trying 'xml'..."
+            #               % result_file.headers['Content-Type'])
+            #self.format = "xml"
+            #self.content_type = mimetypes.types_map[".%s" % self.format]
+            # TODO: assumption here: empty string will not cause harm because
+            # Origin.GET() will break after this
+            return
 
     def PUT(self, data):
         assert self.uri, "GET has to be called before PUT possible"
@@ -138,17 +152,20 @@ class FileBackend(Backend):
 
     def __init__(self, filename, format=None):
         assert os.path.exists(filename)
-        self.filename = filename
 
-        # TODO: assert format in rdflib.parserplugins
         if format:
-            self.format = format
-        else:
-            file_extension = filename.split(".")[-1]
-            if filename != file_extension:
-                self.format = file_extension
+            if assure_parser_plugin_exists(format):
+                self.format = format
             else:
-                self.format = "xml"
+                logger.error("No format set!")
+        else:
+            format = guess_format_from_filename(filename)
+            if format and assure_parser_plugin_exists(format):
+                self.format = format
+            else:
+                logger.error("No format set!")
+
+        self.filename = filename
 
     def GET(self, uri):
         if not hasattr(self, "uri"):
