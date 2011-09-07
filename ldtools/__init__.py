@@ -536,12 +536,12 @@ class Origin(Model):
             assert data
             graph.parse(data=data, publicID=self.uri,
                         format=self.backend.format)
-        except SAXParseException:
+        except SAXParseException as e:
             self.add_error("SAXParseException")
             logger.error("SAXParseException: %s" % self)
             if raise_errors: raise e
             else: return
-        except rdflib.exceptions.ParserError:
+        except rdflib.exceptions.ParserError as e:
             self.add_error("ParserError")
             logger.error("ParserError: %s" % self)
             if raise_errors: raise e
