@@ -452,7 +452,6 @@ class OriginManager(Manager):
                 for origin in crawl:
                     origin.GET(raise_errors=False, **kwargs)
 
-
 class Origin(Model):
 
     uri = URIRefField()
@@ -480,7 +479,7 @@ class Origin(Model):
 
     def GET(self,
             GRAPH_SIZE_LIMIT=30000,
-            follow_uris=None,
+            only_follow_uris=None,
             handle_owl_imports=False,
             skip_urls=None,
             raise_errors=True,
@@ -590,21 +589,72 @@ class Origin(Model):
 
                 delattr(self, "handled")
 
-        if not hasattr(self, "handled"):
-            self._graph = graph
+        if hasattr(self, "handled"):
+            return
 
-            #namespace short hand notation reverse dict
-            self._nsshortdict = reverse_dict(dict(self._graph\
-                .namespace_manager.namespaces()))
+        self._graph = graph
 
-            self.handle_graph(
-                follow_uris=follow_uris,
-                handle_owl_imports=handle_owl_imports,
-            )
+        if not list(self.get_resources()):
+            logger.debug("Resources exist but no _graph --> Resources were "
+                         "created locally")
 
+        def create_origin(o, caused_by=None, # should be Origin object
+                                process_now=False):
+            if not type(o) == rdflib.URIRef:
+                return
 
+            uri = hash_to_slash_uri(o)
+            origin, created = Origin.objects.get_or_create(uri=uri)
+            if created:
+                setattr(origin, '_created_by', caused_by)
+            if process_now:
+                logger.info("Interrupting to load %s because we need to "
+                        "process owl:imports %s first" % (caused_by.uri,
+                                                          origin.uri))
+                origin.GET()
+
+                
+        namespace_short_notation_reverse_dict = reverse_dict(dict(graph\
+            .namespace_manager.namespaces()))
+
+        if only_follow_uris:
+            only_follow_uris = [rdflib.URIRef(u) if not\
+                isinstance(u, rdflib.URIRef) else u for u in only_follow_uris]
+
+        start_time = datetime.datetime.now()
+
+        for subject, predicate, obj_ect in graph:
+            assert hasattr(subject, "n3")
+            #subject = canonalize_uri(subject)
+
+            assert predicate.encode('utf8')
+
+            if handle_owl_imports:
+                if predicate == rdflib.OWL.imports:
+                    create_origin(obj_ect, caused_by=self, process_now=True)
+
+            if only_follow_uris:
+                if predicate in only_follow_uris:
+                    create_origin(obj_ect, caused_by=self)
             else:
+                # follow every URIRef! this could take a long time!
+                create_origin(obj_ect, caused_by=self)
 
+            resource, _created = Resource.objects.get_or_create(uri=subject,
+                                                                origin=self)
+            resource._add_property(predicate, obj_ect,
+                                   namespace_short_notation_reverse_dict)
+
+        self.stats['graph_processing_time'] = datetime.datetime.now() - start_time
+
+        for resource in self.get_resources():
+            resource._has_changes = False
+
+        assert compare.to_isomorphic(graph) == \
+               compare.to_isomorphic(self.graph()), \
+               utils.my_graph_diff(graph, self.graph())
+
+        self.handled = True
 
 
     def get_resources(self):
@@ -651,77 +701,7 @@ class Origin(Model):
                 graph.add(triple)
         return graph
 
-    def handle_graph(self, follow_uris, handle_owl_imports):
-        assert hasattr(self, '_graph')
-        assert not hasattr(self, "handled")
-        if not list(self.get_resources()):
-            logger.debug("Resources exist but no _graph --> Resources were "
-                         "created locally")
-
-        def create_origin(o, caused_by=None, # should be Origin object
-                                process_now=False):
-
-            if isinstance(o, rdflib.Literal):
-                # if follow_uri is used to manipulate which urirefs to follow
-                # this could be an error that occurs
-                logging.error(u"%s is Literal! Only URIRefs are allowed as "
-                              u"follow_uri destination" % o.encode('utf8'))
-                return
-
-            uri = hash_to_slash_uri(o)
-            origin, created = Origin.objects.get_or_create(uri=uri)
-            if created:
-                setattr(origin, '_created_by', caused_by)
-            if process_now:
-                logger.info("Interrupting to load %s because we need to "
-                        "process owl:imports %s first" % (caused_by.uri,
-                                                          origin.uri))
-                origin.GET()
-
-        def add_property_to_resource(origin, subject, predicate, object):
-            resource, _created = Resource.objects.get_or_create(uri=subject,
-                                                                origin=self)
-            resource._add_property(predicate, object)
-
-        if follow_uris:
-            follow_uris = [rdflib.URIRef(u) if not\
-                isinstance(u, rdflib.URIRef) else u for u in follow_uris]
-
-        start_time = datetime.datetime.now()
-
-        for s, p, o in self._graph:
-            assert hasattr(s, "n3")
-            #s = canonalize_uri(s)
-
-            assert p.encode('utf8')
-
-            if handle_owl_imports:
-                if p == rdflib.OWL.imports:
-                    create_origin(o, caused_by=self, process_now=True)
-
-            if follow_uris:
-                if p in follow_uris:
-                    create_origin(o, caused_by=self)
-            #else:
-            #    # follow every URIRef! this could take a long time!
-            #    if type(o) == rdflib.URIRef:
-            #        create_origin(o, caused_by=self)
-
-            add_property_to_resource(self, s, p, o)
-
-        for resource in self.get_resources():
-            resource._has_changes = False
-
-        self.stats['graph_processing_time'] = datetime.datetime.now() - start_time
-
-        assert compare.to_isomorphic(self._graph) == \
-               compare.to_isomorphic(self.graph()), \
-               my_graph_diff(self._graph, self.graph())
-
-        self.handled = True
-
     def has_unsaved_changes(self):
-
         # resource objects exist although not processed yet
         if not self.processed and len(list(self.get_resources())):
             return True
