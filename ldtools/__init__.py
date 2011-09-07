@@ -617,7 +617,9 @@ class Origin(Model):
         namespace_short_notation_reverse_dict = reverse_dict(dict(graph\
             .namespace_manager.namespaces()))
 
-        if only_follow_uris:
+        # TODO: pass only_follow_uris = [] to skip creating origins? --> find
+        # a better way
+        if only_follow_uris is not None:
             only_follow_uris = [rdflib.URIRef(u) if not\
                 isinstance(u, rdflib.URIRef) else u for u in only_follow_uris]
 
@@ -633,7 +635,7 @@ class Origin(Model):
                 if predicate == rdflib.OWL.imports:
                     create_origin(obj_ect, caused_by=self, process_now=True)
 
-            if only_follow_uris:
+            if only_follow_uris is not None:
                 if predicate in only_follow_uris:
                     create_origin(obj_ect, caused_by=self)
             else:
