@@ -1,3 +1,9 @@
+import rdflib
+from rdflib import compare
+import logging
+
+logger = logging.getLogger("ldtools")
+
 
 def my_graph_diff(graph1, graph2):
     """Compares graph2 to graph1 and highlights everything that changed.
