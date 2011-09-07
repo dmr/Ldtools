@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-__version__ = "0.4.4"
+__version__ = "0.4.5"
 __useragent__ = ('ldtools-%s (http://github.com/dmr/ldtools, daniel@nwebs.de)'
                  % __version__)
 
@@ -30,6 +30,7 @@ def get_file_extension(filename):
     extension = filename.split(".")[1:][-1:]
     return str(extension[0]) if extension else ""
 
+
 def assure_parser_plugin_exists(format):
     # TODO: double check if parser for format exists -->
     # TODO: move parser to backend
@@ -41,39 +42,25 @@ def assure_parser_plugin_exists(format):
         logger.error("Parser does not exist for format %s" % format)
         return False
 
+
 def guess_format_from_filename(file_name):
     file_extension = file_name.split(".")[-1]
     if file_name != file_extension:
         return file_extension
 
-def build_filename_from_uri(uri):
-    file_name = uri.lstrip("http://").replace(".","_")\
-        .replace("/","__").replace("?","___").replace("&","____")
 
-    # TODO: hacky
-    folder = os.path.abspath("cache")
-    if not os.path.exists(folder):
-        os.mkdir(folder)
-
-    return os.path.join(folder, file_name)
+class AbstractBackend(object):
+    """Abstract Backend. Overwrite in subclasses"""
+    def GET(self, uri): raise NotImplementedError
+    def PUT(self): raise NotImplementedError
 
 
-
-
-class Backend(object):
-    """ Abstract Backend to demonstrate API
-    """
-    def GET(self, uri):
-        raise NotImplementedError
-    def PUT(self):
-        raise NotImplementedError
-
-
-class RestBackend(Backend):
+class RestBackend(AbstractBackend):
 
     def GET(self, uri):
         """lookup URI"""
-        # TODO: friendly crawling: use robots.txt speed limitation definitions
+        # TODO: do friendly crawling: use robots.txt speed
+        # limitation definitions
 
         if not hasattr(self, "uri"):
             self.uri = uri
@@ -145,7 +132,7 @@ class RestBackend(Backend):
         response = opener.open(request)
 
 
-class FileBackend(Backend):
+class FileBackend(AbstractBackend):
     """Manages one xml file --> Uri that the user wants to "PUT" to is not
     flexible!
     """
@@ -153,17 +140,11 @@ class FileBackend(Backend):
     def __init__(self, filename, format=None):
         assert os.path.exists(filename)
 
-        if format:
-            if assure_parser_plugin_exists(format):
-                self.format = format
-            else:
-                logger.error("No format set!")
+        format = format if format else guess_format_from_filename(filename)
+        if assure_parser_plugin_exists(format):
+            self.format = format
         else:
-            format = guess_format_from_filename(filename)
-            if format and assure_parser_plugin_exists(format):
-                self.format = format
-            else:
-                logger.error("No format set!")
+            logger.error("No format set!")
 
         self.filename = filename
 
@@ -207,7 +188,7 @@ class FileBackend(Backend):
             delattr(self, "old_version")
 
 
-class MemoryBackend(Backend):
+class MemoryBackend(AbstractBackend):
     def __init__(self, data=None, format="xml"):
         self.data = data if data else ""
         self.format = format

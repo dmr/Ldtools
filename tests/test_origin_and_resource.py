@@ -25,7 +25,7 @@ class TestOriginGET(unittest2.TestCase):
         ldtools.Resource.objects.reset_store()
 
         # Sorry @timbl that I use your bandwidth here. Ideas for better example?
-        uri = "http://www.w3.org/People/Berners-Lee/card"
+        uri = "http://dbpedia.org/resource/Karlsruhe"
         self.origin, created = ldtools.Origin.objects.get_or_create(uri)
         self.origin.GET()
 
