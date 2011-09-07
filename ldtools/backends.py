@@ -3,10 +3,14 @@ __version__ = "0.4.3"
 __useragent__ = ('ldtools-%s (http://github.com/dmr/ldtools, daniel@nwebs.de)'
                  % __version__)
 
+import datetime
 import logging
 import mimetypes
+import os
 import rdflib
+import shutil
 import urllib2
+import glob
 
 # add n3 to known mimetypes
 mimetypes.add_type("text/n3", ".n3")

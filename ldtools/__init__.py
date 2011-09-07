@@ -4,11 +4,8 @@ import copy
 import datetime
 import logging
 import mimetypes
-import os
 import rdflib
 import socket;
-import shutil
-import urllib2
 from rdflib.namespace import split_uri
 from rdflib import compare
 from urlparse import urlparse
@@ -428,33 +425,27 @@ class OriginManager(Manager):
         return super(OriginManager, self).create(pk=uri, uri=uri,
                                                  backend=backend)
 
-    def get(self, uri):
+    def get(self, uri, **kwargs):
         """Retrieves Origin object from Store"""
         uri = canonalize_uri(uri)
         return super(OriginManager, self).get(pk=uri)
 
     def get_or_create(self, uri, **kwargs):
-        assert not kwargs, ("If you intend to use 'backend' please use "
-            "Origin.objects.create() directly")
         uri = canonalize_uri(uri)
         assert str(uri) == str(hash_to_slash_uri(uri))
         try:
+            if kwargs:
+                logger.warning("kwargs not supportet in get")
             return self.get(uri), False
         except self.model.DoesNotExist:
-            return self.create(uri), True
+            return self.create(uri, **kwargs), True
 
     @catchKeyboardInterrupt
     def GET_all(self, depth=2, **kwargs):
         """Crawls or Re-Crawls all Origins. Passes Arguments to GET"""
         # TODO: limit crawling speed
-        for _i in range(depth):
-            for origin in self.all():
-                origin.GET(raise_errors=False, **kwargs)
-
-    @catchKeyboardInterrupt
-    def GET_uncrawled(self, depth=2, **kwargs):
-        # TODO: not self.processed? _graph recrawls uris with errors
-        func = lambda origin: True if not hasattr(origin, "_graph") else False
+        assert depth<5
+        func = lambda origin: True if not origin.processed else False
         for _i in range(depth):
             crawl = filter(func, self.all())
             if crawl:
