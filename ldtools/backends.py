@@ -104,10 +104,9 @@ class RestBackend(Backend):
         content = result_file.read()
         return content
 
-    def PUT(self, graph):
-        assert self.uri, "GET has to be called before PUT possible"
 
-        data = graph.serialize(format=self.format)
+    def PUT(self, data):
+        assert self.uri, "GET has to be called before PUT possible"
 
         # TODO: authentication? oauth?
         #h = httplib2.Http()
@@ -158,7 +157,7 @@ class FileBackend(Backend):
             data = f.read()
         return data
 
-    def PUT(self, graph):
+    def PUT(self, data):
         assert self.uri, "GET has to be called before PUT possible"
 
         if os.path.exists(self.filename):
@@ -167,13 +166,13 @@ class FileBackend(Backend):
                                              '%Y%m%d-%H%M%S')
             file_extension = get_file_extension(self.filename)
             if file_extension:
-                old_version = u"%s.%s.%s" % (self.filename.strip(file_extension),
-                                             now, file_extension)
+                old_version = u"%s.%s.%s" % (
+                    self.filename.strip(file_extension),
+                    now, file_extension)
             else:
                 old_version = u"%s_%s" % (self.filename, now)
             shutil.copy(self.filename, old_version)
 
-        data = graph.serialize(format=self.format)
         with open(self.filename, "w") as f:
             f.write(data)
         self.old_version = old_version
@@ -194,5 +193,5 @@ class MemoryBackend(Backend):
     def GET(self, uri):
         return self.data
 
-    def PUT(self, graph):
-        self.data = graph.serialize(format=self.format)
+    def PUT(self, data):
+        self.data = data

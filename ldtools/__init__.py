@@ -752,7 +752,11 @@ class Origin(Model):
         if not self.has_unsaved_changes():
             logging.error("Nothing to PUT for %s!" % self.uri)
             return
-        self.backend.PUT(graph=self.graph())
+
+        graph = self.graph()
+        data = graph.serialize(format=self.backend.format)
+
+        self.backend.PUT(data=data)
         # TODO return "OK"
 
     def get_statistics(self):
