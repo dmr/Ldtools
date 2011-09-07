@@ -93,19 +93,24 @@ def reverse_dict(dct):
     return safe_dict(res)
 
 
-def predicate2pyattr(predicate, namespacedict):
+def predicate2pyattr(predicate, namespace_short_notation_reverse_dict):
     prefix, propertyname = split_uri(predicate)
     assert prefix
     assert propertyname
     #if not "_" in propertyname:
     #    logger.info("%s_%s may cause problems?" % (prefix, propertyname))
-    if not prefix in namespacedict:
+    if not prefix in namespace_short_notation_reverse_dict:
         logger.warning("%s cannot be shortened" % predicate)
         return predicate
-    return u"%s_%s" % (namespacedict[prefix], propertyname)
+
+    if namespace_short_notation_reverse_dict[prefix] == "":
+        return propertyname
+    else:
+        return u"%s_%s" % (namespace_short_notation_reverse_dict[prefix],
+                       propertyname)
 
 
-def pyattr2predicate(pyattr, namespacedict):
+def pyattr2predicate(pyattr, namespace_dict):
     # TODO: build urirefdict instead of unicodedict?
 
     if pyattr.startswith(u"http://"):
@@ -114,19 +119,37 @@ def pyattr2predicate(pyattr, namespacedict):
     splitlist = pyattr.split("_")
 
     # HACK: are there constrains for namespace prefixes?
-    if len(splitlist) > 2 and u"_".join(splitlist[0:2]) in namespacedict:
+    splitlistlen = len(splitlist)
+    if splitlistlen == 1:
+        # attribute "homepage" --> check if "" in namespace_dict
+        prefix = ""
+        property_name = splitlist[0]
+    elif (splitlistlen > 2 and
+        u"_".join(splitlist[0:2]) in namespace_dict):
         # http://www.geonames.org/ontology# defines 'wgs84_pos' --> \
         # 'wgs84_pos_lat' cannot be solved with approach we took until now
         prefix = u"_".join(splitlist[0:2])
         property_name = u"_".join(splitlist[2:])
+        assert prefix, pyattr
     else:
         prefix = splitlist[0]
         property_name = u"_".join(splitlist[1:])
+        assert prefix, pyattr
 
-    assert prefix, pyattr
     assert property_name, pyattr
-    assert namespacedict[prefix], pyattr
-    return rdflib.URIRef(u"%s%s" % (namespacedict[prefix], property_name))
+
+    # timbl foaf defines foaf as "" --> mbox_sha1sum makes problems here
+    if "" in namespace_dict:
+        if not prefix in namespace_dict:
+            logger.error("problem. %s, %s" % (prefix, pyattr))
+            return rdflib.URIRef(u"%s%s"
+        % (namespace_dict[""], pyattr))
+    else:
+        assert namespace_dict[prefix], (u"%s not in namespace_dict. Trying to "
+            "solve %s") % (prefix, pyattr)
+
+    return rdflib.URIRef(u"%s%s"
+        % (namespace_dict[prefix], property_name))
 
 
 from backends import *
@@ -252,7 +275,8 @@ class Resource(Model):
                 dct.pop(attr)
         return dct
 
-    def _add_property(self, predicate, object):
+    def _add_property(self, predicate, object,
+                      namespace_short_notation_reverse_dict):
         assert isinstance(predicate, rdflib.URIRef),\
             "Not an URIRef: %s"%predicate
         assert hasattr(predicate, "n3"),\
@@ -272,7 +296,8 @@ class Resource(Model):
                     logger.debug("Not a Resource URI because not valid: %s "
                                  "--> should be rdflib.Literals?" % object)
 
-        predicate = predicate2pyattr(predicate, self._origin._nsshortdict)
+        predicate = predicate2pyattr(predicate,
+                                     namespace_short_notation_reverse_dict)
 
         if is_resource:
             logger.debug("%s . %s = Resource( %s )"
@@ -309,14 +334,18 @@ class Resource(Model):
         # reconverting from __dict__?
         assert str(predicate) in self.__dict__
 
-    def _tripleserialize_iterator(self, namespace_dict):
+    def _tripleserialize_iterator(self,
+                                  namespace_dict):
         for property, values in self.__dict__.items():
 
             # skip internals
             if str(property).startswith("_") or property == "pk":
                 continue
 
-            property = pyattr2predicate(property, namespace_dict)
+            if property.startswith("http://"):
+                property = rdflib.URIRef(property)
+            else:
+                property = pyattr2predicate(property, namespace_dict)
 
             assert hasattr(property, "n3"), \
                 "property %s is not a rdflib object" % property
@@ -632,23 +661,21 @@ class Origin(Model):
         #     isomorphic graphs but the resulting graph is is different
         #     if they miss
         #  2) doesn't detect duplicate definitions of namespaces
-        namespaces = dict(self._graph.namespace_manager\
-                            .namespaces())
-        for prefix, namespace in safe_dict(namespaces).items():
+        namespace_dict = dict(self._graph.namespace_manager.namespaces())
+
+        for prefix, namespace in safe_dict(namespace_dict).items():
             graph.bind(prefix=prefix, namespace=namespace)
         new_ns = dict(graph.namespace_manager.namespaces())
 
-        assert namespaces == new_ns, [(k, v) for k, v in
-                  safe_dict(namespaces)\
-                  .items() if not k in safe_dict(new_ns).keys()]
+        assert namespace_dict == new_ns, [(k, v)
+            for k, v in safe_dict(namespace_dict).items() \
+                if not k in safe_dict(new_ns).keys()]
 
         for resource in self.get_resources():
             # TODO: better idea how to do this?
             # __dict__ converts rdflib.urirefs to strings -->
             # converts back to uriref
             # {'foaf': 'http:/....', ...}
-            namespace_dict = dict(self._graph.namespace_manager.namespaces())
-
             for triple in resource._tripleserialize_iterator(namespace_dict):
                 graph.add(triple)
         return graph
