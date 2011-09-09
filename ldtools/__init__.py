@@ -184,8 +184,29 @@ class ResourceManager(Manager):
 
         return obj
 
+    def get_authoritative_resource(self, uri,
+                                   create_nonexistent_origin=True):
+        """Tries to return the Resource object from the original origin"""
 
-    def get(self, uri, origin=None, return_authoritative_resource=True):
+        uri = canonalize_uri(uri)
+        origin_uri = hash_to_slash_uri(uri)
+
+        authoritative_origin = Origin.objects.filter(uri=origin_uri)
+        authoritative_origin_list = list(authoritative_origin)
+        if len(authoritative_origin_list) == 1:
+            origin = authoritative_origin_list[0]
+        else:
+            if create_nonexistent_origin:
+                origin = Origin.objects.create(uri=origin_uri)
+                origin.GET(only_follow_uris=[])
+            else:
+                raise self.model.DoesNotExist("No authoritative "
+                "Resource found for %s" %uri)
+
+        authoritative_resource = self.get(uri, origin)
+        return authoritative_resource
+
+    def get(self, uri, origin=None):
         """If the authoratative Origin to the Resource does not exist and no
         origin is given then DoesNotExist is returned. Assumption is
         to only trust validated sources.
@@ -208,24 +229,11 @@ class ResourceManager(Manager):
                 # return only match
                 return filter_result[0]
             else:
-                if return_authoritative_resource:
-                    # try to return best match
-                    authoritative_resource = None
-                    for resource in filter_result:
-                        if uri.startswith(resource._origin.uri):
-                            authoritative_resource = resource
-                            break
-                    if authoritative_resource:
-                        return authoritative_resource
-                    else:
-                        raise self.model.DoesNotExist("No authoritative "
-                            "Resource found for %s" %uri)
-                else:
-                    raise self.model.DoesNotExist("Please pass the exact "
-                        "Origin. The Resource you are looking for is "
-                        "provided by the Origins: %s"
-                        % ", ".join([unicode(r._origin.uri)
-                                     for r in filter_result]))
+                raise self.model.DoesNotExist("Please pass the exact "
+                    "Origin. The Resource you are looking for is "
+                    "provided by the Origins: %s"
+                    % ", ".join([unicode(r._origin.uri)
+                                 for r in filter_result]))
 
         assert isinstance(origin, Origin), origin
         pk = self.get_pk(origin_uri=origin.uri, uri=uri)
