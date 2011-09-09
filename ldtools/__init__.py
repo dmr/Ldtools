@@ -11,8 +11,6 @@ from rdflib import compare
 from urlparse import urlparse
 from xml.sax._exceptions import SAXParseException
 
-import utils
-
 # TODO: find a better way to set socket timeout
 socket.setdefaulttimeout(5)
 
@@ -45,7 +43,7 @@ def catchKeyboardInterrupt(func):
 
 
 def canonalize_uri(uriref):
-    """Returns Uri that is valid or raises Exception"""
+    """Returns Uri that is valid and canonalized or raises Exception"""
     if not uriref:
         raise UriNotValid("uri is None")
 
@@ -53,6 +51,7 @@ def canonalize_uri(uriref):
     # lowercase domain, http and https is equal then I couldn't compare graphs
     # anymore
 
+    # TODO: this should not be in "canonalize_uri"
     if isinstance(uriref, rdflib.BNode):
         return uriref
 
@@ -108,9 +107,8 @@ def predicate2pyattr(predicate, namespace_short_notation_reverse_dict):
 
 
 def pyattr2predicate(pyattr, namespace_dict):
-    # TODO: build urirefdict instead of unicodedict?
-
     if pyattr.startswith(u"http://"):
+        # TODO: build urirefdict instead of unicodedict?
         return rdflib.URIRef(pyattr)
 
     splitlist = pyattr.split("_")
@@ -590,7 +588,12 @@ class Origin(Model):
             if not compare.to_isomorphic(self._graph) == \
                    compare.to_isomorphic(graph):
                 logging.warning("GET retrieved updates for %s!" % self.uri)
-                utils.my_graph_diff(self._graph, graph)
+
+                try:
+                    import utils
+                    utils.my_graph_diff(self._graph, graph)
+                except ImportError:
+                    pass
 
                 for resource in self.get_resources():
                     resource.delete()
@@ -622,7 +625,7 @@ class Origin(Model):
                 origin.GET()
 
                 
-        namespace_short_notation_reverse_dict = reverse_dict(dict(graph\
+        namespace_short_notation_reverse_dict = reverse_dict(dict(self._graph\
             .namespace_manager.namespaces()))
 
         # TODO: pass only_follow_uris = [] to skip creating origins? --> find
@@ -633,7 +636,7 @@ class Origin(Model):
 
         start_time = datetime.datetime.now()
 
-        for subject, predicate, obj_ect in graph:
+        for subject, predicate, obj_ect in self._graph:
             assert hasattr(subject, "n3")
             #subject = canonalize_uri(subject)
 
@@ -660,9 +663,8 @@ class Origin(Model):
         for resource in self.get_resources():
             resource._has_changes = False
 
-        assert compare.to_isomorphic(graph) == \
-               compare.to_isomorphic(self.graph()), \
-               utils.my_graph_diff(graph, self.graph())
+        assert compare.to_isomorphic(self._graph) == \
+               compare.to_isomorphic(self.graph()), "Graphs differ!"
 
         self.handled = True
 
