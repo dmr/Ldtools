@@ -357,7 +357,6 @@ class Resource(Model):
                         v = convert_to_rdflib_object(v)
                     yield((self._uri, property, v))
 
-
     def __setattr__(self, key, value):
         # TODO: is there a better way to validate attributes?
         if key in self._meta.fields:
@@ -370,33 +369,18 @@ class Resource(Model):
         Model.__setattr__(self, key, value)
 
     def delete(self):
-        if hasattr(self, "_has_changes"):
-            assert not self._has_changes
-        assert hasattr(self, "pk") and self.pk is not None
-        # TODO: use Collector objects as django does
-        self.__class__.objects._storage.__delitem__(self.pk)
+        if hasattr(self, "pk") and self.pk is not None:
+            self.__class__.objects._storage.__delitem__(self.pk)
 
     def save(self):
-        # TODO: introduce "clean" to make sure only valid properties modified
+        # TODO Move to models.py and introduce "clean" to validate properties
         created = not self.pk
         if created:
-            assert 0, ("Please use Resource.objects.create() to create Resource"
-                       "objects!")
-            #assert not self.__class__.objects.get(self.uri, self.origin)
-            #self = self.__class__.objects.create(**self.get_attributes())
-
-        # TODO: write tests for the following lines
+            assert 0, ("Please use Resource.objects.create() to create "
+                       "Resource objects!")
         assert self in Resource.objects.filter(_origin=self._origin)
-
-        if self in Resource.objects.filter(_origin=self._origin,
-                _has_changes=True):
-            assert len(list(Resource.objects.filter(_origin=self._origin,
-                _has_changes=True))) == 1
-        else:
-            logging.info("New resource object was created")
-
-        #values = dict((name, getattr(self, name)) for name in \
-        #        self._meta.fields.iterkeys())
+        #values = dict((name, getattr(self, name)) for name in
+        # self._meta.fields.iterkeys())
         self.update() #**values)
 
     def update(self):
@@ -404,14 +388,10 @@ class Resource(Model):
         self._has_changes = False
 
 
-######### Origin #########
-
 class OriginManager(Manager):
 
     def create_hook(self, uri):
-        assert not '#' in uri, ("HashURI not allowed as Origin: %s. Maybe "
-            "you are looking for "
-            "Resource.objects.get_or_create(...,auto_origin=True)?" % uri)
+        assert not '#' in uri, ("HashURI not allowed as Origin: %s" % uri)
 
     def create(self, uri, BACKEND=None):
         uri = canonalize_uri(uri)
@@ -463,14 +443,14 @@ class Origin(Model):
         self.processed = False
 
     def __unicode__(self):
-        str = u"%s" % unicode(self.uri)
-        str += " %s" % self.backend.__class__.__name__
+        str = [unicode(self.uri)]
+        str.append(self.backend.__class__.__name__)
         if hasattr(self, 'errors'):
             for error in self.errors:
-                str += u" %s" % error
+                str.append(error)
         if self.processed:
-            str += u" Processed"
-        return str
+            str.append(u"Processed")
+        return u" ".join(str)
 
     def GET(self,
             GRAPH_SIZE_LIMIT=30000,
@@ -483,6 +463,11 @@ class Origin(Model):
         if not self.uri:
             raise Exception("Please provide URI first")
 
+        if skip_urls is not None and str(self.uri) in skip_urls:
+            self.add_error("Skipped")
+            self.processed = True
+            return
+
         logger.info(u"GET %s..." % self.uri)
 
         if self.has_unsaved_changes():
@@ -492,11 +477,6 @@ class Origin(Model):
             else:
                 logger.warning("There were Resource objects created before "
                                "processing the resource's origin.")
-
-        if skip_urls is not None and str(self.uri) in skip_urls:
-            self.add_error("Skipped")
-            self.processed = True
-            return
 
         self.stats['last_processed'] = datetime.datetime.now()
 
@@ -525,11 +505,13 @@ class Origin(Model):
 
         graph = rdflib.graph.ConjunctiveGraph(identifier=self.uri)
 
+        publicID = self.uri
+
         try:
             # Important: Do not pass data=data without publicID=uri because
             # relative URIs (#deri) won't be an absolute uri in that case!
-            assert data
-            graph.parse(data=data, publicID=self.uri,
+            graph.parse(data=data,
+                        publicID=publicID,
                         format=self.backend.format)
         except SAXParseException as e:
             self.add_error("SAXParseException")
@@ -566,7 +548,7 @@ class Origin(Model):
                 return
 
         # normal rdflib.compare does not work correctly with
-        # conjunctiveGraph, unless there is only one graph within that
+        # ConjunctiveGraph, unless there is only one graph within that
         assert len(list(graph.contexts())) == 1
 
         if hasattr(self, "_graph"):
@@ -662,21 +644,19 @@ class Origin(Model):
         return Resource.objects.filter(_origin=self)
 
     def graph(self):
-        """Processes every Resource and Property related to 'self' and
-        creates rdflib.ConjunctiveGraph because rdflib.Graph does not allow
-        parsing plugins
-        """
-        # TODO: rdflib.graph() ?
+        """Processes every Resource and Property related to 'self'"""
+        #rdflib.ConjunctiveGraph because rdflib.Graph does not allow parsing plugins
         graph = rdflib.graph.ConjunctiveGraph(identifier=self.uri)
 
         if not hasattr(self, '_graph'):
-            if len(self.errors) == 0:
-                self.GET(raise_errors=False) # TODO: test for recursion?
-            else:
-                logging.error("Origin %s has Errors --> can't process .graph()"
-                    % self.uri)
-                return graph
-
+            if hasattr(self, 'errors'):
+                if len(self.errors) == 0:
+                    self.GET(raise_errors=False) # TODO: test for recursion?
+                else:
+                    logging.error("Origin %s has Errors --> can't process "
+                                  ".graph()"
+                        % self.uri)
+                    return graph
         # TODO: find a better way to do this
         # Problems:
         #  1) namespace bindings are not really necessary to validate
@@ -729,6 +709,11 @@ class Origin(Model):
         data = graph.serialize(format=self.backend.format)
 
         self.backend.PUT(data=data)
+
+        for resource in Resource.objects.filter(_has_changes=True):
+            resource._has_changes = False
+
+        assert not self.has_unsaved_changes(), "something went wrong"
         # TODO return "OK"
 
     def get_statistics(self):
