@@ -528,6 +528,11 @@ class Origin(Model):
             graph.parse(data=data,
                         publicID=publicID,
                         format=self.backend.format)
+
+            # normal rdflib.compare does not work correctly with
+            # ConjunctiveGraph, unless there is only one graph within that
+            assert len(list(graph.contexts())) == 1
+
         except SAXParseException as e:
             self.add_error("SAXParseException")
             logger.error("SAXParseException: %s" % self)
@@ -546,33 +551,27 @@ class Origin(Model):
             else: return
 
         self.processed = True
-        if not graph:
-            logger.warning("%s did not return any information" % self.uri)
-            return
 
-        if hasattr(self, "errors"): delattr(self, "errors")
+        if hasattr(self, "errors"):
+            delattr(self, "errors")
 
         g_length = len(graph)
-        if g_length > 5000:
-            logger.warning("len(graph) == %s" % g_length)
-            if g_length > GRAPH_SIZE_LIMIT:
-                logger.error("Maximum graph size is set to %s. The aquired "
-                             "graph exceeds that! Pass "
-                             "GRAPH_SIZE_LIMIT to set it differently."
-                             % GRAPH_SIZE_LIMIT);
-                return
-
-        # normal rdflib.compare does not work correctly with
-        # ConjunctiveGraph, unless there is only one graph within that
-        assert len(list(graph.contexts())) == 1
+        if g_length > GRAPH_SIZE_LIMIT:
+            logger.error("Maximum graph size exceeded. Thr graph is %s "
+                         "triples big. Limit is set to %s. The aquired "
+                         "graph exceeds that! Pass GRAPH_SIZE_LIMIT to set it "
+                         "differently." % (g_length, GRAPH_SIZE_LIMIT))
+            return
 
         if hasattr(self, "_graph"):
             # we already assured that there are no unsaved_changes
             # --> graph() == _graph
             logger.info(u"Already crawled: %s. Comparing graphs..." % self.uri)
 
-            if not compare.to_isomorphic(self._graph) == \
-                   compare.to_isomorphic(graph):
+            if compare.to_isomorphic(self._graph) == \
+               compare.to_isomorphic(graph):
+                return
+            else:
                 logging.warning("GET retrieved updates for %s!" % self.uri)
 
                 try:
@@ -719,30 +718,6 @@ class Origin(Model):
 
         assert not self.has_unsaved_changes(), "something went wrong"
         # TODO return "OK"
-
-    def get_statistics(self):
-        def triples_per_second(triples, time): # TODO make this more accurate
-            total_seconds = (time.microseconds+(time.seconds+\
-                                      time.days*24*3600)*10**6)//10**6
-            return triples / total_seconds if total_seconds > 0 else None
-
-        if hasattr(self, '_graph'):
-            triples = len(self._graph)
-            tps = triples_per_second(triples,
-                                     self.stats['graph_processing_time'])
-            if tps:
-                logger.info(
-                    "Crawled %s: '%s' triples in '%s' seconds --> '%s' "
-                    "triples/second"
-                    % (self.uri, triples,
-                       self.stats['graph_processing_time'], tps))
-            else:
-                logger.info("Crawled %s in '%s' seconds"
-                % (self.uri, self.stats['graph_processing_time']))
-            pass
-        else:
-            print "no statistics recorded"
-
 
 
 def check_shortcut_consistency():
