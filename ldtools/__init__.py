@@ -560,7 +560,7 @@ class Origin(Model):
 
         if hasattr(self, "_graph"):
             # we already assured that there are no unsaved_changes
-            # --> graph() == _graph
+            # --> get_graph() == _graph
             logger.info(u"Already crawled: %s. Comparing graphs..." % self.uri)
 
             if compare.to_isomorphic(self._graph) == \
@@ -595,11 +595,7 @@ class Origin(Model):
 
         self.handled = True
 
-
-    def get_resources(self):
-        return Resource.objects.filter(_origin=self)
-
-    def graph(self):
+    def get_graph(self):
         """Processes every Resource and Property related to 'self'"""
         #rdflib.ConjunctiveGraph because rdflib.Graph does not allow parsing plugins
         graph = rdflib.graph.ConjunctiveGraph(identifier=self.uri)
@@ -639,6 +635,9 @@ class Origin(Model):
                 graph.add(triple)
         return graph
 
+    def get_resources(self):
+        return Resource.objects.filter(_origin=self)
+
     def has_unsaved_changes(self):
         # objects with changed attributes exist
         if any(resource._has_changes
@@ -659,7 +658,7 @@ class Origin(Model):
             logging.error("Nothing to PUT for %s!" % self.uri)
             return
 
-        graph = self.graph()
+        graph = self.get_graph()
         data = graph.serialize(format=self.backend.format)
 
         # TODO: synchronize if remote resource is still up to date?

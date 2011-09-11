@@ -28,11 +28,11 @@ class OriginGETGraphTestCase(unittest2.TestCase, SetupOriginMixin):
         self.origin = self._get_origin()
 
     def test_graphs_equal(self):
-
+        # TODO: make this file callable and with parameter: check URIs
         self.origin.GET(only_follow_uris=[])
 
         g1 = self.origin._graph
-        g2 = self.origin.graph()
+        g2 = self.origin.get_graph()
 
         # normal rdflib.compare does not work correctly with
         # conjunctiveGraph, unless there is only one graph within that
