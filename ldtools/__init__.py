@@ -194,10 +194,12 @@ class ResourceManager(Manager):
         else:
             if create_nonexistent_origin:
                 origin = Origin.objects.create(uri=origin_uri)
-                origin.GET(only_follow_uris=[])
             else:
                 raise self.model.DoesNotExist("No authoritative "
                 "Resource found for %s" %uri)
+
+        # TODO: make this configurable
+        origin.GET(only_follow_uris=[])
 
         authoritative_resource = self.get(uri, origin)
         return authoritative_resource
@@ -267,17 +269,6 @@ class Resource(Model):
             return False
         if hash_to_slash_uri(self._uri) == str(self._origin.uri):
             return True
-
-    def get_attributes(self):
-        dct = copy.copy(self.__dict__)
-        for attr in [u"pk",
-            u"_origin",
-            u"_uri",
-            u"_reverse",
-            u"_has_changes"]:
-            if hasattr(self, attr):
-                dct.pop(attr)
-        return dct
 
     def _add_property(self, predicate, object,
                       namespace_short_notation_reverse_dict):
