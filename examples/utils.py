@@ -36,10 +36,10 @@ class ColoredFormatter(logging.Formatter):
         return logging.Formatter.format(self, record)
 formatter = ColoredFormatter("%(asctime)s %(name)s %(funcName)s:%(lineno)d"
                              " %(levelname)s: %(message)s")
+handler = logging.StreamHandler()
 handler.setFormatter(formatter)
 
 logger = logging.getLogger()
-handler = logging.StreamHandler()
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 #logger.setLevel(logging.INFO)
@@ -69,7 +69,7 @@ def pprint_resource(resource):
 def pprint_origins_and_resources():
     res = {}
     for s in ldtools.Origin.objects.all():
-        for _ in range(5): print
+        for _ in range(3): print
         pprint.pprint(s)
         print
         for r in s.get_resources():
