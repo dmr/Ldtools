@@ -512,26 +512,21 @@ class Origin(Model):
             if raise_errors: raise e
             else: return
 
-        if not data:
-            self.processed = True
-            return
-
-        assert self.backend.format, "format is needed later"
-
         graph = rdflib.graph.ConjunctiveGraph(identifier=self.uri)
 
-        publicID = self.uri
 
         try:
-            # Important: Do not pass data=data without publicID=uri because
-            # relative URIs (#deri) won't be an absolute uri in that case!
-            graph.parse(data=data,
-                        publicID=publicID,
-                        format=self.backend.format)
+            if data:
+                # Important: Do not pass data=data without publicID=uri because
+                # relative URIs (#deri) won't be an absolute uri in that case!
+                publicID = self.uri
+                graph.parse(data=data,
+                            publicID=publicID,
+                            format=self.backend.format)
 
-            # normal rdflib.compare does not work correctly with
-            # ConjunctiveGraph, unless there is only one graph within that
-            assert len(list(graph.contexts())) == 1
+                # normal rdflib.compare does not work correctly with
+                # ConjunctiveGraph, unless there is only one graph within that
+                assert len(list(graph.contexts())) == 1
 
         except SAXParseException as e:
             self.add_error("SAXParseException")
@@ -637,10 +632,6 @@ class Origin(Model):
 
         for resource in self.get_resources():
             resource._has_changes = False
-
-        assert compare.to_isomorphic(self._graph) == \
-               compare.to_isomorphic(self.graph()), "Graphs differ!"
-
         self.handled = True
 
 
