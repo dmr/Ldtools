@@ -80,6 +80,17 @@ def hash_to_slash_uri(uri):
     return uri
 
 
+def convert_to_rdflib_object(v):
+    if hasattr(v, "n3"):
+        return v
+
+    if hasattr(v, "startswith") and v.startswith("http://"):
+        # float has no attribute startswith
+        return rdflib.URIRef(v)
+    else:
+        return rdflib.Literal(v)
+
+
 def reverse_dict(dct):
     res = {}
     for k,v in dct.iteritems():
@@ -584,22 +595,6 @@ class Origin(Model):
             logger.debug("Resources exist but no _graph --> Resources were "
                          "created locally")
 
-        def create_origin(o, caused_by=None, # should be Origin object
-                                process_now=False):
-            if not type(o) == rdflib.URIRef:
-                return
-
-            uri = hash_to_slash_uri(o)
-            origin, created = Origin.objects.get_or_create(uri=uri)
-            if created:
-                setattr(origin, '_created_by', caused_by)
-            if process_now:
-                logger.info("Interrupting to load %s because we need to "
-                        "process owl:imports %s first" % (caused_by.uri,
-                                                          origin.uri))
-                origin.GET()
-
-                
         namespace_short_notation_reverse_dict = reverse_dict(dict(self._graph\
             .namespace_manager.namespaces()))
 
@@ -618,15 +613,22 @@ class Origin(Model):
             assert predicate.encode('utf8')
 
             if handle_owl_imports:
-                if predicate == rdflib.OWL.imports:
-                    create_origin(obj_ect, caused_by=self, process_now=True)
+                if (predicate == rdflib.OWL.imports
+                    and type(obj_ect) == rdflib.URIRef):
+
+                    uri = hash_to_slash_uri(obj_ect)
+                    origin, created = Origin.objects.get_or_create(uri=uri)
+
+                    logger.info("Interrupting because we need to "
+                            "process owl:imports %s first" % (origin.uri))
+                    origin.GET()
 
             if only_follow_uris is not None:
                 if predicate in only_follow_uris:
-                    create_origin(obj_ect, caused_by=self)
+                    Origin.objects.get_or_create(uri=hash_to_slash_uri(obj_ect))
             else:
-                # follow every URIRef! this could take a long time!
-                create_origin(obj_ect, caused_by=self)
+                # follow every URIRef
+                Origin.objects.get_or_create(uri=hash_to_slash_uri(obj_ect))
 
             resource, _created = Resource.objects.get_or_create(uri=subject,
                                                                 origin=self)
@@ -661,6 +663,7 @@ class Origin(Model):
                                   ".graph()"
                         % self.uri)
                     return graph
+
         # TODO: find a better way to do this
         # Problems:
         #  1) namespace bindings are not really necessary to validate
@@ -709,6 +712,7 @@ class Origin(Model):
         graph = self.graph()
         data = graph.serialize(format=self.backend.format)
 
+        # TODO: synchronize if remote resource is still up to date?
         self.backend.PUT(data=data)
 
         for resource in Resource.objects.filter(_has_changes=True):
