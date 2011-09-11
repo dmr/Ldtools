@@ -358,15 +358,19 @@ class Resource(Model):
                     yield((self._uri, property, v))
 
     def __setattr__(self, key, value):
-        # TODO: is there a better way to validate attributes?
+        if key == "_has_changes":
+            Model.__setattr__(self, key, value)
+            return
+
         if key in self._meta.fields:
             field = self._meta.fields.get(key)
             if field and value:
                 value = field.to_python(value)
-        elif not key.startswith("_") and not key == "pk": # TODO: rename to_pk?
-            # rdf properties here
-            self._has_changes = True
+        elif not key.startswith("_") and not key == "pk":
+            # Assumption: rdf attributes do not start with "_"
+            pass # TODO: validate
         Model.__setattr__(self, key, value)
+        self._has_changes = True
 
     def delete(self):
         if hasattr(self, "pk") and self.pk is not None:
@@ -683,14 +687,11 @@ class Origin(Model):
         return graph
 
     def has_unsaved_changes(self):
-        # resource objects exist although not processed yet
-        if not self.processed and len(list(self.get_resources())):
-            return True
-
         # objects with changed attributes exist
         if any(resource._has_changes
                 for resource in self.get_resources()\
-                    if hasattr(resource, '_has_changes')):
+                    if (hasattr(resource, '_has_changes')
+                        and resource._has_changes == True)):
             return True
 
         return False
