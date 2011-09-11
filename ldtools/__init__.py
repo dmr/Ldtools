@@ -601,14 +601,14 @@ class Origin(Model):
         graph = rdflib.graph.ConjunctiveGraph(identifier=self.uri)
 
         if not hasattr(self, '_graph'):
-            if hasattr(self, 'errors'):
-                if len(self.errors) == 0:
-                    self.GET(raise_errors=False) # TODO: test for recursion?
-                else:
-                    logging.error("Origin %s has Errors --> can't process "
-                                  ".graph()"
-                        % self.uri)
-                    return graph
+            if hasattr(self, 'errors') and len(self.errors) != 0:
+                logging.error("Origin %s has Errors --> can't process "
+                              ".get_graph()"
+                    % self.uri)
+                return graph
+
+            #self.GET(raise_errors=False) # TODO: test for recursion?
+
 
         # TODO: find a better way to do this
         # Problems:
