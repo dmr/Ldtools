@@ -244,13 +244,19 @@ class Resource(Model):
     objects = ResourceManager()
 
     def __unicode__(self):
-        str = u"%s" % self._uri
-        if hasattr(self, 'foaf_name'):
-            str += u' "%s"' % unicode(self.foaf_name)
-            if len(self.foaf_name) > 1: str += u",..."
-        if hasattr(self, "_origin") and isinstance(self._origin, Origin):
-            str += u" [%r]" % self._origin.uri.encode("utf8")
-        return str
+        str = [u"%s" % self._uri]
+        if hasattr(self, "_origin"):
+            assert isinstance(self._origin, Origin)
+            if self.is_authoritative_resource():
+                str.append(u"*authoritative*")
+            else:
+                str.append(u"[%r]" % self._origin.uri.encode("utf8"))
+        return " ".join(str)
+
+    def is_authoritative_resource(self):
+        assert isinstance(self._uri, rdflib.URIRef)
+        if hash_to_slash_uri(self._uri) == str(self._origin.uri):
+            return True
 
     def get_attributes(self):
         dct = copy.copy(self.__dict__)
