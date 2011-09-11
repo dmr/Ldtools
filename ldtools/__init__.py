@@ -5,13 +5,13 @@ import datetime
 import logging
 import mimetypes
 import rdflib
-import socket;
+import socket
+import urlparse
 from rdflib.namespace import split_uri
 from rdflib import compare
-from urlparse import urlparse
 from xml.sax._exceptions import SAXParseException
 
-# TODO: find a better way to set socket timeout
+# socket timeout set to 5 seconds globally
 socket.setdefaulttimeout(5)
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ def catchKeyboardInterrupt(func):
         try:
             func(*args, **kwargs)
         except KeyboardInterrupt, _e:
-            print 'KeyboardInterrupt --> %s cancelled' % func
+            print 'KeyboardInterrupt --> Cancelling %s' % func
     return dec
 
 
@@ -47,11 +47,10 @@ def canonalize_uri(uriref):
     if not uriref:
         raise UriNotValid("uri is None")
 
-    # TODO: if I would implement canonalization following rfc (cut port,
-    # lowercase domain, http and https is equal then I couldn't compare graphs
-    # anymore
+    # TODO: implement canonalization: cut port 80, lowercase domain,
+    # http and https is equal. Problem: graph comparison
 
-    # TODO: this should not be in "canonalize_uri"
+    # Workaround for rdflib's handling of BNodes
     if isinstance(uriref, rdflib.BNode):
         return uriref
 
@@ -61,7 +60,7 @@ def canonalize_uri(uriref):
         raise UriNotValid("Not valid: %s" % uriref)
 
     if not hasattr(uriref, "n3"):
-        logger.debug(u"Not an URIRef: %s, fixing that." % uriref)
+        logger.debug(u"Converting %s to URIRef" % uriref)
         uriref = rdflib.URIRef(uriref)
 
     if uriref.startswith('#'):
@@ -72,17 +71,16 @@ def canonalize_uri(uriref):
 
 def hash_to_slash_uri(uri):
     """Converts Hash to Slash uri http://www.w3.org/wiki/HashURI"""
-    # TODO: replace with urlparse
     assert isinstance(uri, rdflib.URIRef)
-    if '#' in uri:
-        real_uri, hash_value = uri.split("#")
-        assert real_uri
-        return real_uri
+
+    parsed = urlparse.urlparse(uri)
+    #if parsed.fragment: print "HashURI"
+    uri = urlparse.urlunparse((parsed.scheme, parsed.netloc, parsed.path,
+                         parsed.params, parsed.query,""))
     return uri
 
 
 def reverse_dict(dct):
-    # TODO rdflib.URIRef dict?
     res = {}
     for k,v in dct.iteritems():
         res[v] = k
@@ -108,12 +106,11 @@ def predicate2pyattr(predicate, namespace_short_notation_reverse_dict):
 
 def pyattr2predicate(pyattr, namespace_dict):
     if pyattr.startswith(u"http://"):
-        # TODO: build urirefdict instead of unicodedict?
         return rdflib.URIRef(pyattr)
 
     splitlist = pyattr.split("_")
 
-    # HACK: are there constrains for namespace prefixes?
+    # TODO: check for namespace prefix limitations
     splitlistlen = len(splitlist)
     if splitlistlen == 1:
         # attribute "homepage" --> check if "" in namespace_dict
@@ -121,8 +118,8 @@ def pyattr2predicate(pyattr, namespace_dict):
         property_name = splitlist[0]
     elif (splitlistlen > 2 and
         u"_".join(splitlist[0:2]) in namespace_dict):
-        # http://www.geonames.org/ontology# defines 'wgs84_pos' --> \
-        # 'wgs84_pos_lat' cannot be solved with approach we took until now
+        # manually handle 'wgs84_pos_lat'
+        # http://www.geonames.org/ontology#
         prefix = u"_".join(splitlist[0:2])
         property_name = u"_".join(splitlist[2:])
         assert prefix, pyattr
@@ -133,24 +130,21 @@ def pyattr2predicate(pyattr, namespace_dict):
 
     assert property_name, pyattr
 
-    # timbl foaf defines foaf as "" --> mbox_sha1sum makes problems here
+    # i.e.: foaf defined as "" --> manually handle 'mbox_sha1sum'
     if "" in namespace_dict:
         if not prefix in namespace_dict:
             logger.error("problem. %s, %s" % (prefix, pyattr))
             return rdflib.URIRef(u"%s%s"
         % (namespace_dict[""], pyattr))
     else:
-        assert namespace_dict[prefix], (u"%s not in namespace_dict. Trying to "
-            "solve %s") % (prefix, pyattr)
+        assert namespace_dict[prefix], (u"%s not in namespace_dict") % prefix
 
-    return rdflib.URIRef(u"%s%s"
-        % (namespace_dict[prefix], property_name))
+    return rdflib.URIRef(u"%s%s" % (namespace_dict[prefix], property_name))
 
 
 from backends import *
 from models import *
 
-######### Resource #########
 
 class ResourceManager(Manager):
 
@@ -162,30 +156,21 @@ class ResourceManager(Manager):
         #assert origin.processed, ("Origin has to be processed before creating "
         #    "more Resource objects: origin.GET()")
 
+        # Absolutize relative URIs
         if uri.startswith("#"):
             assert not isinstance(uri, rdflib.BNode), \
-                "bnode should not start with #"
+                "BNode not allowed to start with #"
             uri = rdflib.URIRef(origin.uri + uri)
 
         uri = canonalize_uri(uri)
+
         pk = self.get_pk(origin_uri=origin.uri, uri=uri)
-
-        obj = super(ResourceManager, self).create(
-            pk=pk, _uri=uri, _origin=origin, **kwargs
-        )
-
-        # move to tests
-        if isinstance(uri, rdflib.BNode):
-            assert isinstance(obj._uri, rdflib.BNode)
-
-        assert not hasattr(obj, "_has_changes")
-
-        return obj
+        return super(ResourceManager, self).create(
+            pk=pk, _uri=uri, _origin=origin, **kwargs)
 
     def get_authoritative_resource(self, uri,
                                    create_nonexistent_origin=True):
         """Tries to return the Resource object from the original origin"""
-
         uri = canonalize_uri(uri)
         origin_uri = hash_to_slash_uri(uri)
 
