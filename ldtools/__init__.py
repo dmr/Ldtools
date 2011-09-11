@@ -76,7 +76,6 @@ def hash_to_slash_uri(uri):
         return uri
 
     parsed = urlparse.urlparse(uri)
-    #if parsed.fragment: print "HashURI"
     uri = urlparse.urlunparse((parsed.scheme, parsed.netloc, parsed.path,
                          parsed.params, parsed.query,""))
     return uri

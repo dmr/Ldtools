@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-__version__ = "0.5"
+__version__ = "0.5.1"
 __useragent__ = ('ldtools-%s (http://github.com/dmr/ldtools, daniel@nwebs.de)'
                  % __version__)
 
@@ -95,6 +95,8 @@ class RestBackend(AbstractBackend):
             if format in ["rdf", "ksh"]:
                 # fix responses that we know are wrong
                 format = "xml"
+
+            # TODO: try rdfa for format = "html"?
 
             if assure_parser_plugin_exists(format):
                 self.format = format
