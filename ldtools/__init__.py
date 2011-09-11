@@ -623,11 +623,10 @@ class Origin(Model):
                             "process owl:imports %s first" % (origin.uri))
                     origin.GET()
 
-            if only_follow_uris is not None:
-                if predicate in only_follow_uris:
-                    Origin.objects.get_or_create(uri=hash_to_slash_uri(obj_ect))
-            else:
-                # follow every URIRef
+            if (type(obj_ect) == rdflib.URIRef
+                and ((only_follow_uris is not None
+                      and predicate in only_follow_uris)
+                     or only_follow_uris is None)):
                 Origin.objects.get_or_create(uri=hash_to_slash_uri(obj_ect))
 
             resource, _created = Resource.objects.get_or_create(uri=subject,
