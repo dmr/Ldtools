@@ -277,7 +277,7 @@ class Resource(Model):
             is_resource = True
         elif isinstance(object, rdflib.URIRef):
             if not isinstance(object, rdflib.Literal):
-                o = urlparse(object)
+                o = urlparse.urlparse(object)
                 if o.scheme == "http":
                     is_resource = True
                 else:
@@ -344,6 +344,8 @@ class Resource(Model):
                         # If object is referenced in attribute, "de-reference"
                         yield((self._uri, property, v._uri))
                     else:
+                        if not hasattr(v, "n3"):
+                            v = convert_to_rdflib_object(v)
                         yield((self._uri, property, v))
             else:
                 v = values
@@ -351,6 +353,8 @@ class Resource(Model):
                     # If object is referenced in attribute, "de-reference"
                     yield((self._uri, property, v._uri))
                 else:
+                    if not hasattr(v, "n3"):
+                        v = convert_to_rdflib_object(v)
                     yield((self._uri, property, v))
 
 
