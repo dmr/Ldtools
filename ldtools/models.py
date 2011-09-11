@@ -94,13 +94,21 @@ class Model(object):
 
     def __init__(self, pk=None, **kwargs):
         self.pk = pk
+
+        # Set the defined modelfields properly
         for attr_name, field in self._meta.fields.iteritems():
-            attr = kwargs.pop(attr_name)
-            value = field.to_python(attr)
+            if attr_name in kwargs:
+                attr = kwargs.pop(attr_name)
+                value = field.to_python(attr)
+            else:
+                value = field.to_python()
             setattr(self, attr_name, value)
+
+        # Set the not kwargs values not defined as fields
+        for attr_name, value in kwargs.items():
+            setattr(self, attr_name, value)
+
         if kwargs:
-            # TODO ValueError is raised on object creation with kwargs.
-            # inconsistent: after that, no checks performed.
             raise ValueError('%s are not part of the schema for %s'
                 % (', '.join(kwargs.keys()), self.__class__.__name__))
 
@@ -117,7 +125,6 @@ class Model(object):
                 return False
 
         return True
-
 
     def __ne__(self, other):
         if type(other) != type(self):
@@ -177,15 +184,15 @@ class Manager(object):
     def filter(self, **kwargs):
         def check_if_equals_or_in_set((key, value)):
             """helper method for loop. Convenient but maybe hacky: checks
-            if value is in attr or if iterable inside the iterable"""
+            if value is in attr or if iterable inside the set/list"""
             if hasattr(item, key):
                 items_value = getattr(item, key)
-                # TODO why can't we check for hasattr(items_value, "__iter__")?
                 if type(items_value) in [list, set]:
-                    if value in items_value:
-                        return True
+                    for items_value in items_value:
+                        if items_value == value:
+                            return True
                 else:
-                    if unicode(items_value) == unicode(value):
+                    if items_value == value:
                         return True
             return False
 
@@ -194,7 +201,8 @@ class Manager(object):
                 yield item
 
     def create(self, pk, **kwargs):
-        instance = self.model(pk=pk, **kwargs)
+        kwargs['pk'] = pk
+        instance = self.model(**kwargs)
         assert not pk in self._storage, ("%s object with pk %s already exists!"
             % (self.model, pk))
         self._storage[pk] = instance
