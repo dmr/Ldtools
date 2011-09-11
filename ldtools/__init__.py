@@ -568,7 +568,6 @@ class Origin(Model):
                 return
             else:
                 logging.warning("GET retrieved updates for %s!" % self.uri)
-
                 try:
                     import utils
                     utils.my_graph_diff(self._graph, graph)
@@ -577,7 +576,6 @@ class Origin(Model):
 
                 for resource in self.get_resources():
                     resource.delete()
-
                 delattr(self, "handled")
 
         if hasattr(self, "handled"):
@@ -585,53 +583,16 @@ class Origin(Model):
 
         self._graph = graph
 
-        if not list(self.get_resources()):
-            logger.debug("Resources exist but no _graph --> Resources were "
-                         "created locally")
-
-        namespace_short_notation_reverse_dict = reverse_dict(dict(self._graph\
-            .namespace_manager.namespaces()))
-
-        # TODO: pass only_follow_uris = [] to skip creating origins? --> find
-        # a better way
-        if only_follow_uris is not None:
-            only_follow_uris = [rdflib.URIRef(u) if not\
-                isinstance(u, rdflib.URIRef) else u for u in only_follow_uris]
-
         start_time = datetime.datetime.now()
 
-        for subject, predicate, obj_ect in self._graph:
-            assert hasattr(subject, "n3")
-            #subject = canonalize_uri(subject)
-
-            assert predicate.encode('utf8')
-
-            if handle_owl_imports:
-                if (predicate == rdflib.OWL.imports
-                    and type(obj_ect) == rdflib.URIRef):
-
-                    uri = hash_to_slash_uri(obj_ect)
-                    origin, created = Origin.objects.get_or_create(uri=uri)
-
-                    logger.info("Interrupting because we need to "
-                            "process owl:imports %s first" % (origin.uri))
-                    origin.GET()
-
-            if (type(obj_ect) == rdflib.URIRef
-                and ((only_follow_uris is not None
-                      and predicate in only_follow_uris)
-                     or only_follow_uris is None)):
-                Origin.objects.get_or_create(uri=hash_to_slash_uri(obj_ect))
-
-            resource, _created = Resource.objects.get_or_create(uri=subject,
-                                                                origin=self)
-            resource._add_property(predicate, obj_ect,
-                                   namespace_short_notation_reverse_dict)
+        graph_handler = GraphHandler(
+            only_follow_uris=only_follow_uris,
+            handle_owl_imports=handle_owl_imports,
+            origin=self)
+        graph_handler.populate_resources(graph=graph)
 
         self.stats['graph_processing_time'] = datetime.datetime.now() - start_time
 
-        for resource in self.get_resources():
-            resource._has_changes = False
         self.handled = True
 
 
@@ -722,3 +683,57 @@ def check_shortcut_consistency():
                     assert global_namespace_dict[k] == v
                 else:
                     global_namespace_dict[k] = v
+
+
+class GraphHandler(object):
+    def __init__(self, origin, only_follow_uris, handle_owl_imports):
+        self.origin=origin
+
+        self.handle_owl_imports=handle_owl_imports
+        if only_follow_uris is not None:
+            only_follow_uris = [rdflib.URIRef(u) if not\
+                isinstance(u, rdflib.URIRef) else u for u in only_follow_uris]
+        self.only_follow_uris=only_follow_uris
+
+    def populate_resources(self, graph):
+        namespace_short_notation_reverse_dict = reverse_dict(dict(graph\
+            .namespace_manager.namespaces()))
+
+        for subject, predicate, obj_ect in graph:
+            assert hasattr(subject, "n3")
+            #subject = canonalize_uri(subject)
+
+            #if isinstance(subject, rdflib.BNode):
+            #    assert 0, "subject is BNode: %s %s %s" % (subject, predicate, obj_ect)
+            #if isinstance(predicate, rdflib.BNode):
+            #    assert 0, "predicate is BNode: %s %s %s" % (subject, predicate, obj_ect)
+            #if isinstance(obj_ect, rdflib.BNode):
+            #    assert 0, "object is BNode: %s %s %s" % (subject, predicate, obj_ect)
+
+            # workaround for rdflib's unicode problems
+            assert predicate.encode('utf8')
+
+            if self.handle_owl_imports:
+                if (predicate == rdflib.OWL.imports
+                    and type(obj_ect) == rdflib.URIRef):
+
+                    uri = hash_to_slash_uri(obj_ect)
+                    origin, created = Origin.objects.get_or_create(uri=uri)
+
+                    logger.info("Interrupting because we need to "
+                            "process owl:imports %s first" % (origin.uri))
+                    origin.GET()
+
+            if ((self.only_follow_uris is not None
+                 and predicate in self.only_follow_uris)
+                or self.only_follow_uris is None):
+                if type(obj_ect) == rdflib.URIRef:
+                    Origin.objects.get_or_create(uri=hash_to_slash_uri(obj_ect))
+
+            resource, _created = Resource.objects.get_or_create(uri=subject,
+                                                        origin=self.origin)
+            resource._add_property(predicate, obj_ect,
+                                   namespace_short_notation_reverse_dict)
+
+        for resource in self.origin.get_resources():
+            resource._has_changes = False
