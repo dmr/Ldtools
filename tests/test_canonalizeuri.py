@@ -6,26 +6,24 @@ import urlparse
 
 
 class TestUrlparse(unittest2.TestCase):
-
     def test_hash1(self):
-        uri = "www.cwi.nl:80/%7Eguido/Python.html"
+        uri = "http://www.cwi.nl:80/%7Eguido/Python.html"
         o = urlparse.urlparse(uri)
         self.assert_(not o.fragment)
 
     def test_hash2(self):
-        uri = "www.cwi.nl:80/%7Eguido/Python.html#fragm"
+        uri = "http://www.cwi.nl:80/%7Eguido/Python.html#fragm"
         o = urlparse.urlparse(uri)
-        self.assertEqual(o.fragment, "fragm", o.fragment)
+        self.assertEqual(o.fragment, "fragm")
 
     def test_hash3(self):
-        uri = "www.cwi.nl:80/%7Eguido/Python.html#bla"
+        uri = "http://www.cwi.nl:80/%7Eguido/Python.html#bla"
         r = urlparse.urlsplit(uri)
-        self.assertEqual(r.geturl(), "www.cwi.nl:80/%7Eguido/Python.html#bla",
-            r.geturl())
+        self.assertEqual(r.geturl(),
+                         "http://www.cwi.nl:80/%7Eguido/Python.html#bla")
 
 
 class TestCanonalizeUri(unittest2.TestCase):
-
     def test_empty1(self):
         self.assertRaises(ldtools.UriNotValid, ldtools.canonalize_uri, "")
 
@@ -34,7 +32,7 @@ class TestCanonalizeUri(unittest2.TestCase):
                           rdflib.URIRef(""))
 
     def test_literal(self):
-        # TODO
+        # TODO raise better error
         self.assertRaises(AssertionError, ldtools.canonalize_uri,
                           rdflib.Literal("a"))
 

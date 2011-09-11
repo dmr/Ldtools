@@ -1,0 +1,82 @@
+<rdf:RDF
+ xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+ xmlns:z="http://www.zotero.org/namespaces/export#"
+ xmlns:dcterms="http://purl.org/dc/terms/"
+ xmlns:bib="http://purl.org/net/biblio#"
+ xmlns:foaf="http://xmlns.com/foaf/0.1/"
+ xmlns:dc="http://purl.org/dc/elements/1.1/"
+ xmlns:prism="http://prismstandard.org/namespaces/1.2/basic/"
+ xmlns:link="http://purl.org/rss/1.0/modules/link/">
+    <bib:Article rdf:about="http://www.ncbi.nlm.nih.gov/pubmed/18273724">
+        <z:itemType>journalArticle</z:itemType>
+        <dcterms:isPartOf rdf:resource="urn:issn:0954-6634"/>
+        <bib:authors>
+            <rdf:Seq>
+                <rdf:li>
+                    <foaf:Person>
+                        <foaf:surname>Lee</foaf:surname>
+                        <foaf:givenname>Hyoun Seung</foaf:givenname>
+                    </foaf:Person>
+                </rdf:li>
+                <rdf:li>
+                    <foaf:Person>
+                        <foaf:surname>Lee</foaf:surname>
+                        <foaf:givenname>Jong Hee</foaf:givenname>
+                    </foaf:Person>
+                </rdf:li>
+                <rdf:li>
+                    <foaf:Person>
+                        <foaf:surname>Ahn</foaf:surname>
+                        <foaf:givenname>Gun Young</foaf:givenname>
+                    </foaf:Person>
+                </rdf:li>
+                <rdf:li>
+                    <foaf:Person>
+                        <foaf:surname>Lee</foaf:surname>
+                        <foaf:givenname>Dong Hun</foaf:givenname>
+                    </foaf:Person>
+                </rdf:li>
+                <rdf:li>
+                    <foaf:Person>
+                        <foaf:surname>Shin</foaf:surname>
+                        <foaf:givenname>Jung Won</foaf:givenname>
+                    </foaf:Person>
+                </rdf:li>
+                <rdf:li>
+                    <foaf:Person>
+                        <foaf:surname>Kim</foaf:surname>
+                        <foaf:givenname>Dong Hyun</foaf:givenname>
+                    </foaf:Person>
+                </rdf:li>
+                <rdf:li>
+                    <foaf:Person>
+                        <foaf:surname>Chung</foaf:surname>
+                        <foaf:givenname>Jin Ho</foaf:givenname>
+                    </foaf:Person>
+                </rdf:li>
+            </rdf:Seq>
+        </bib:authors>
+
+        <dc:title>Fractional photothermolysis for the tre blablabla</dc:title>
+        <dcterms:abstract>OBJECTIVES: Atrophic post-acne blablabla.</dcterms:abstract>
+        <bib:pages>45-49</bib:pages>
+        <dc:date>2008</dc:date>
+        <z:shortTitle>Fractional photothermolysis for the t</z:shortTitle>
+        <dc:identifier>
+            <dcterms:URI>
+               <rdf:value>http://www.ncbi.nlm.nih.gov/pubmed/18273724</rdf:value>
+            </dcterms:URI>
+        </dc:identifier>
+        <dcterms:dateSubmitted>2010-12-06 11:36:52</dcterms:dateSubmitted>
+        <z:libraryCatalog>NCBI PubMed</z:libraryCatalog>
+        <dc:description>PMID: 18273724</dc:description>
+    </bib:Article>
+    <bib:Journal rdf:about="urn:issn:0954-6634">
+        <dc:title>The Journal of Dermatological Treatment</dc:title>
+        <prism:volume>19</prism:volume>
+        <prism:number>1</prism:number>
+        <dcterms:alternative>J Dermatolog Treat</dcterms:alternative>
+        <dc:identifier>DOI 10.1080/09546630701691244</dc:identifier>
+        <dc:identifier>ISSN 0954-6634</dc:identifier>
+    </bib:Journal>
+</rdf:RDF>

@@ -130,6 +130,7 @@ class RestBackend(AbstractBackend):
                                   headers=headers)
         request.get_method = lambda: 'PUT'
         response = opener.open(request)
+        # assert status_code 200, 201?
 
 
 class FileBackend(AbstractBackend):
