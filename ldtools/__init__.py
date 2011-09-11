@@ -223,14 +223,8 @@ class ResourceManager(Manager):
         return super(ResourceManager, self).get(pk=pk)
         assert 0, "implement!"
 
-    def get_or_create(self, uri, origin=None, auto_origin=False):
+    def get_or_create(self, uri, origin=None):
         uri = canonalize_uri(uri)
-        if auto_origin:
-            assert not origin, "Either origin or auto_origin, not both"
-            origin_uri = hash_to_slash_uri(uri)
-            origin, _origin_created = Origin.objects\
-                .get_or_create(uri=origin_uri)
-
         try:
             return self.get(uri=uri, origin=origin), False
         except self.model.DoesNotExist:
