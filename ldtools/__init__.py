@@ -71,7 +71,9 @@ def canonalize_uri(uriref):
 
 def hash_to_slash_uri(uri):
     """Converts Hash to Slash uri http://www.w3.org/wiki/HashURI"""
-    assert isinstance(uri, rdflib.URIRef)
+    if not isinstance(uri, rdflib.URIRef):
+        logger.error("Cannot analyse %s (type %s)" % (uri, type(uri)))
+        return uri
 
     parsed = urlparse.urlparse(uri)
     #if parsed.fragment: print "HashURI"
@@ -249,7 +251,7 @@ class Resource(Model):
     objects = ResourceManager()
 
     def __unicode__(self):
-        str = [u"%s" % self._uri]
+        str = [u"%r" % self._uri.encode('utf8')]
         if hasattr(self, "_origin"):
             assert isinstance(self._origin, Origin)
             if self.is_authoritative_resource():
@@ -259,7 +261,10 @@ class Resource(Model):
         return " ".join(str)
 
     def is_authoritative_resource(self):
-        assert isinstance(self._uri, rdflib.URIRef)
+        if not isinstance(self._uri, rdflib.URIRef):
+            # BNodes don't have an URI
+            logger.warning("Cannot compare %s" % type(self._uri))
+            return False
         if hash_to_slash_uri(self._uri) == str(self._origin.uri):
             return True
 
@@ -462,7 +467,7 @@ class Origin(Model):
         str.append(self.backend.__class__.__name__)
         if hasattr(self, 'errors'):
             for error in self.errors:
-                str.append(error)
+                str.append(unicode(error))
         if self.processed:
             str.append(u"Processed")
         return u" ".join(str)
@@ -719,8 +724,8 @@ class GraphHandler(object):
                     uri = hash_to_slash_uri(obj_ect)
                     origin, created = Origin.objects.get_or_create(uri=uri)
 
-                    logger.info("Interrupting because we need to "
-                            "process owl:imports %s first" % (origin.uri))
+                    logger.info("Interrupting to process owl:imports %s"
+                                "first" % (origin.uri))
                     origin.GET()
 
             if ((self.only_follow_uris is not None
