@@ -192,7 +192,7 @@ class ResourceManager(Manager):
             origin = authoritative_origin_list[0]
         else:
             if create_nonexistent_origin:
-                origin = Origin.objects.get_or_create(uri=origin_uri)
+                origin, created = Origin.objects.get_or_create(uri=origin_uri)
             else:
                 raise self.model.DoesNotExist("No authoritative "
                 "Resource found for %s" %uri)
