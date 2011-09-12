@@ -406,12 +406,18 @@ class OriginManager(Manager):
     def create_hook(self, uri):
         assert not '#' in uri, ("HashURI not allowed as Origin: %s" % uri)
 
+    def post_create_hook(self, origin):
+        # hook to be overwritten but using application
+        # origin.timedelta = datetime.timedelta(minutes=2)
+        return origin
+
     def create(self, uri, BACKEND=None):
         uri = canonalize_uri(uri)
         self.create_hook(uri)
         backend = BACKEND if BACKEND else RestBackend()
-        return super(OriginManager, self).create(pk=uri, uri=uri,
+        origin = super(OriginManager, self).create(pk=uri, uri=uri,
                                                  backend=backend)
+        return self.post_create_hook(origin)
 
     def get(self, uri, **kwargs):
         """Retrieves Origin object from Store"""
@@ -491,7 +497,15 @@ class Origin(Model):
                 logger.warning("There were Resource objects created before "
                                "processing the resource's origin.")
 
-        self.stats['last_processed'] = datetime.datetime.now()
+        now = datetime.datetime.now()
+        #self.timedelta = datetime.timedelta(minutes=1)
+        if hasattr(self, "timedelta") and 'last_processed' in self.stats:
+            time_since_last_processed = now - self.stats['last_processed']
+            if (time_since_last_processed < self.timedelta):
+                logger.info("Not processing %s again because was processed "
+                "only %s ago" % (self.uri, time_since_last_processed))
+                return
+        self.stats['last_processed'] = now
 
         try:
             data = self.backend.GET(self.uri)
@@ -559,6 +573,7 @@ class Origin(Model):
         if hasattr(self, "_graph"):
             # we already assured that there are no unsaved_changes
             # --> get_graph() == _graph
+
             logger.info(u"Already crawled: %s. Comparing graphs..." % self.uri)
 
             if compare.to_isomorphic(self._graph) == \
