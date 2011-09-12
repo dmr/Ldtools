@@ -184,7 +184,7 @@ class ResourceManager(Manager):
                                    create_nonexistent_origin=True):
         """Tries to return the Resource object from the original origin"""
         uri = canonalize_uri(uri)
-        origin_uri = hash_to_slash_uri(uri)
+        origin_uri = rdflib.URIRef(hash_to_slash_uri(uri))
 
         authoritative_origin = Origin.objects.filter(uri=origin_uri)
         authoritative_origin_list = list(authoritative_origin)
@@ -192,15 +192,16 @@ class ResourceManager(Manager):
             origin = authoritative_origin_list[0]
         else:
             if create_nonexistent_origin:
-                origin = Origin.objects.create(uri=origin_uri)
+                origin = Origin.objects.get_or_create(uri=origin_uri)
             else:
                 raise self.model.DoesNotExist("No authoritative "
                 "Resource found for %s" %uri)
 
         # TODO: make this configurable
-        origin.GET(only_follow_uris=[])
+        if not origin.has_unsaved_changes():
+            origin.GET(only_follow_uris=[])
 
-        authoritative_resource = self.get(uri, origin)
+        authoritative_resource = self.get(uri=uri, origin=origin)
         return authoritative_resource
 
     def get(self, uri, origin=None):
@@ -262,10 +263,12 @@ class Resource(Model):
         return " ".join(str)
 
     def is_authoritative_resource(self):
-        if not isinstance(self._uri, rdflib.URIRef):
-            # BNodes don't have an URI
-            logger.warning("Cannot compare %s" % type(self._uri))
-            return False
+        """Definition "authoritative" according to
+        "SAOR: Authoritative Reasoning for the Web"
+        http://www.springerlink.com/content/w47632745gm76x01/"""
+        if isinstance(self._uri, rdflib.BNode):
+            return True
+
         if hash_to_slash_uri(self._uri) == str(self._origin.uri):
             return True
 

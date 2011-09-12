@@ -79,10 +79,63 @@ class ResourceCreate(unittest2.TestCase):
 
 
 class ResourceGetAuthoritative(unittest2.TestCase):
-    def test(self):
-        #uri = "http://customer1.sa.rechd.de"
-        #Resource.objects.get_authoritative_resource(uri)
-        pass
+    def setUp(self):
+        Origin.objects.reset_store()
+        Resource.objects.reset_store()
+
+    def test_is_same_uri(self):
+        origin1 = Origin.objects.create(uri="http://example1.com/person1",
+            BACKEND=ldtools.MemoryBackend("""
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+<person1> a foaf:Person;
+    foaf:knows <http://example2.com/person2>.
+<http://example2.com/person2> foaf:name "Max".""", format="n3"))
+        origin1.GET()
+
+        r1 = Resource.objects.get(uri="http://example1.com/person1")
+
+        self.assert_(r1.is_authoritative_resource())
+
+        # TODO: trick: Origin obj for second person was already
+        # created --> overwrite backend parameter
+        origin2 = Origin.objects.get(uri="http://example2.com/person2")
+        self.assert_(not origin2.processed)
+        origin2.backend = ldtools.MemoryBackend("""
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+<person2> a foaf:Person;
+    foaf:name "Maximilian".""", format="n3")
+
+        r2 = Resource.objects.get(uri="http://example2.com/person2")
+
+        self.assert_(not r2.is_authoritative_resource())
+
+        r2auth = Resource.objects.get_authoritative_resource(r2._uri)
+
+        self.assert_(r2auth.is_authoritative_resource())
+
+        # check if our trick worked
+        self.assertEqual(r2auth._origin, origin2)
+        self.assert_(origin2.processed)
+
+    def test_blank_node_is_auth(self):
+        origin1 = Origin.objects.create(uri="http://example1.com/person1",
+            BACKEND=ldtools.MemoryBackend("""
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+<person1> foaf:knows _:max.
+_:max foaf:name "Max".""", format="n3"))
+        origin1.GET()
+
+        r1 = Resource.objects.get(uri="http://example1.com/person1")
+
+        self.assert_(r1.is_authoritative_resource())
+
+        resources = set(r1._origin.get_resources())
+        resources.discard(r1)
+        assert len(list(resources)) == 1,list(resources)
+        der_max = list(resources)[0]
+
+        self.assert_(der_max.is_authoritative_resource())
+
 
 
 class ResourceSave(unittest2.TestCase):
