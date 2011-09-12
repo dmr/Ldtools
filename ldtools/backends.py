@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-__version__ = "0.5.2"
+__version__ = "0.5.3"
 __useragent__ = ('ldtools-%s (http://github.com/dmr/ldtools, daniel@nwebs.de)'
                  % __version__)
 
@@ -70,7 +70,8 @@ class RestBackend(AbstractBackend):
                                 "backend")
 
         headers = {'User-agent': __useragent__,
-                   'Accept':('application/rdf+xml,text/rdf+n3;q=0.9,'
+                   'Accept':('text/n3;q=1,'
+                             'application/rdf+xml,text/rdf+n3;q=0.9,'
                              'application/xhtml+xml;q=0.5, */*;q=0.1')}
 
         request = urllib2.Request(url=self.uri, headers=headers)
