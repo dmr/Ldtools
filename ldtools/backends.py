@@ -2,6 +2,10 @@
 __version__ = "0.5.3"
 __useragent__ = ('ldtools-%s (http://github.com/dmr/ldtools, daniel@nwebs.de)'
                  % __version__)
+headers = {'User-agent': __useragent__,
+           'Accept':('text/n3;q=1,'
+                     'application/rdf+xml,text/rdf+n3;q=0.9,'
+                     'application/xhtml+xml;q=0.5, */*;q=0.1')}
 
 import datetime
 import logging
@@ -68,11 +72,6 @@ class RestBackend(AbstractBackend):
             if not self.uri == uri:
                 raise Exception("You cannot pass different uris to the same "
                                 "backend")
-
-        headers = {'User-agent': __useragent__,
-                   'Accept':('text/n3;q=1,'
-                             'application/rdf+xml,text/rdf+n3;q=0.9,'
-                             'application/xhtml+xml;q=0.5, */*;q=0.1')}
 
         request = urllib2.Request(url=self.uri, headers=headers)
 
