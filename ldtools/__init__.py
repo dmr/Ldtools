@@ -426,7 +426,8 @@ class OriginManager(Manager):
 
     def get_or_create(self, uri, **kwargs):
         uri = canonalize_uri(uri)
-        assert str(uri) == str(hash_to_slash_uri(uri))
+        if not uri == hash_to_slash_uri(uri):
+            logger.error("URI is not a slash URI: %s" % uri)
         try:
             if kwargs:
                 logger.warning("kwargs not supportet in get")
@@ -740,7 +741,8 @@ class GraphHandler(object):
                  and predicate in self.only_follow_uris)
                 or self.only_follow_uris is None):
                 if type(obj_ect) == rdflib.URIRef:
-                    Origin.objects.get_or_create(uri=hash_to_slash_uri(obj_ect))
+                    obj_uriref = hash_to_slash_uri(obj_ect)
+                    Origin.objects.get_or_create(uri=obj_uriref)
 
             resource, _created = Resource.objects.get_or_create(uri=subject,
                                                         origin=self.origin)
