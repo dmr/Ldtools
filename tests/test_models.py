@@ -6,34 +6,18 @@ from ldtools import models
 
 
 class ModelInit1TestCase(unittest2.TestCase):
-    def test_init(self):
-        class Sample1(models.Model):
-            attr1 = models.StringField()
-        self.assertIn('pk', Sample1(attr1="test").__dict__.keys())
+    def test_init_creates_pk(self):
+        class TestModel(models.Model): pass
+        self.assertIn('pk', TestModel().__dict__.keys())
 
 
-class ModelHashAndEqTestCase(unittest2.TestCase):
-    def setUp(self):
-        class Sample2(models.Model):
-            attr1 = models.StringField()
-            attr2 = models.StringField()
-        self.p1 = Sample2(attr1=u"hü", attr2=u"vä")
-        self.p2 = Sample2(attr1=u"hü", attr2=u"vä")
-        self.p3 = Sample2(attr1=u"hüa", attr2=u"vä")
-
-    def test_hash1(self):
-        sett=set([self.p1, self.p2])
-        self.assertIn(self.p1, sett)
-
-    def test_hash2(self):
-        self.assertNotIn(self.p3, set([self.p1, self.p2]))
-
-    def test_equivalence1(self):
-        self.assertEquals(self.p1, self.p2)
-
-    def test_equivalence2(self):
-        self.assertNotEquals(self.p1, self.p3)
-
+class ModelURIRefFieldTestCase(unittest2.TestCase):
+    def test_init_requires_uriref(self):
+        class TestModel(models.Model):
+            uri = models.URIRefField()
+        self.assertIn('pk', TestModel(uri=rdflib.URIRef("test")).__dict__)
+        self.assertRaises(ValueError, TestModel, uri="test")
+        
 
 class ManagerCreateTestCase(unittest2.TestCase):
     def test_create(self):
@@ -43,14 +27,6 @@ class ManagerCreateTestCase(unittest2.TestCase):
         pk = attr1 = u"tü"
         self.o = Sample3.objects.create(pk=pk, attr1=attr1)
         assert self.o in Sample3.objects.all()
-
-
-class ModelURIRefFieldTestCase(unittest2.TestCase):
-    def test_init(self):
-        class Sample4(models.Model):
-            uri = models.URIRefField()
-        self.assertIn('pk',
-                      Sample4(uri=rdflib.URIRef("test")).__dict__.keys())
 
 
 class Sample3(models.Model):

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import unittest2
 import copy
 
@@ -108,3 +109,18 @@ class ModelEqualityAndHashFunctionTestCase(unittest2.TestCase):
         o1, o2 = self._create_objects(dict(pk=1, attr1="test1"),
                                       dict(pk=2, attr1="test2"))
         self.assertNotEqual(o1, o2)
+
+    def test_hash1(self):
+        o1, o2 = self._create_objects(dict(pk=1, attr1="test1"),
+                                      dict(pk=2, attr1="test2"))
+        sett = set([o1, o2])
+        self.assertEquals(len(sett), 2)
+        self.assertIn(o1, sett)
+        self.assertIn(o2, sett)
+
+    def test_hash2(self):
+        o1, o2 = self._create_objects(dict(pk=1, attr1="test1"),
+                                      dict(pk=2, attr1="test1"))
+        o2.pk=1
+        sett = set([o1, o2])
+        self.assertEquals(len(sett), 1)

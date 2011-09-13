@@ -28,10 +28,9 @@ class StringField(Field):
 class URIRefField(Field):
     def to_python(self, value=None):
         if value:
-            assert not isinstance(value, rdflib.Literal)
-            assert isinstance(value, (rdflib.URIRef,
-                rdflib.BNode)), "please pass uriref!"
-            #value = rdflib.URIRef(unicode(value))
+            if (not isinstance(value, (rdflib.URIRef, rdflib.BNode))\
+                or isinstance(value, rdflib.Literal)):
+                raise ValueError("please pass uriref!")
         else:
             value = rdflib.URIRef(u'')
         return value
