@@ -522,6 +522,11 @@ class Origin(Model):
             self.add_error("timeout")
             if raise_errors: raise e
             else: return
+        except ContentNegotiationError as e:
+            logger.error(e.message)
+            if raise_errors: raise e
+            else: return
+
 
         graph = rdflib.graph.ConjunctiveGraph(identifier=self.uri)
 
@@ -657,7 +662,6 @@ class Origin(Model):
                     if (hasattr(resource, '_has_changes')
                         and resource._has_changes == True)):
             return True
-
         return False
 
     def PUT(self):

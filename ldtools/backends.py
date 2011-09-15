@@ -16,8 +16,13 @@ import shutil
 import urllib2
 import glob
 
+
 # add n3 to known mimetypes
 mimetypes.add_type("text/n3", ".n3")
+
+class FiletypeMappingError(Exception): pass
+class ContentNegotiationError(Exception): pass
+
 
 logger = logging.getLogger("ldtools")
 
@@ -32,11 +37,11 @@ def assure_parser_plugin_exists(format):
     # TODO: move parser to backend
     try:
         rdflib.graph.plugin.get(name=format,
-                                kind=rdflib.parser.Parser)
-        return True
+                            kind=rdflib.parser.Parser)
     except rdflib.plugin.PluginException as e:
-        logger.error("Parser does not exist for format %s" % format)
-        return False
+        msg = "Not parser plugin found for %s" % format
+        logger.error(msg)
+        raise ContentNegotiationError(msg)
 
 
 def guess_format_from_filename(file_name):
@@ -70,40 +75,38 @@ class RestBackend(AbstractBackend):
         opener = urllib2.build_opener() #SmartRedirectHandler())
         result_file = opener.open(request)
 
+
+        if not "Content-Type" in result_file.headers:
+            raise FiletypeMappingError("No Content-Type specified in response")
         self.content_type = result_file.headers['Content-Type'].split(";")[0]
 
         # Many servers don't do content negotiation: if one of the following
         # content_types are returned by server, assume the mapped type
-        content_type_mapping = {
+        overwrite_content_type_map = {
             "text/plain": "application/rdf+xml"
         }
+        if self.content_type in overwrite_content_type_map:
+            self.content_type = overwrite_content_type_map[self.content_type]
 
-        if self.content_type in content_type_mapping:
-            self.content_type = content_type_mapping[self.content_type]
+        try:
+            file_extension = mimetypes.guess_extension(self.content_type)
+            assert file_extension
+        except AssertionError as e:
+            logger.error("%s not supported by ldtools"
+                         % result_file.headers['Content-Type'])
+            raise FiletypeMappingError("No mimetype found for %s"
+                                   % self.content_type)
 
-        file_extension = mimetypes.guess_extension(self.content_type)
-        if file_extension:
-            format = file_extension.strip(".")
-            if format in ["rdf", "ksh"]:
-                # fix responses that we know are wrong
-                format = "xml"
+        format = file_extension.strip(".")
+        if format in ["rdf", "ksh"]:
+            # fix responses that we know are wrong
+            format = "xml"
 
-            # TODO: try rdfa for format = "html"?
+        assure_parser_plugin_exists(format)
 
-            if assure_parser_plugin_exists(format):
-                self.format = format
+        self.format = format
+        return result_file.read()
 
-                data = result_file.read()
-
-                return data
-        else:
-            #logger.warning("%s not supported by ldtools. Trying 'xml'..."
-            #               % result_file.headers['Content-Type'])
-            #self.format = "xml"
-            #self.content_type = mimetypes.types_map[".%s" % self.format]
-            # TODO: assumption here: empty string will not cause harm because
-            # Origin.GET() will break after this
-            return
 
     def PUT(self, data):
         assert self.uri, "GET has to be called before PUT possible"
