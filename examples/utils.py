@@ -9,49 +9,10 @@ from rdflib import compare
 
 import ldtools
 from ldtools import Resource, Origin
-
-Origin.objects.reset_store()
-Resource.objects.reset_store()
-
-# overwrites sys.excepthook
-import ipdb #; ipdb.set_trace()
-
-# setup logging
-class ColoredFormatter(logging.Formatter):
-    def format(self, record):
-        BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
-        #The background is set with 40 plus the number of the color, and
-        # the foreground with 30
-        #These are the sequences need to get colored ouput
-        RESET_SEQ = "\033[0m"
-        COLOR_SEQ = "\033[1;%dm"
-        BOLD_SEQ = "\033[1m"
-        COLORS = {'DEBUG': BLUE,'INFO': MAGENTA,
-            'WARNING': YELLOW,'CRITICAL': YELLOW,'ERROR': RED}
-        if record.levelname in COLORS:
-            record.levelname = COLOR_SEQ % (30 + COLORS[record.levelname]) + \
-                              record.levelname + RESET_SEQ
-        record.msg = unicode(record.msg)
-        record.msg = COLOR_SEQ % (30 + GREEN) + record.msg + RESET_SEQ
-        return logging.Formatter.format(self, record)
-formatter = ColoredFormatter("%(asctime)s %(name)s %(funcName)s:%(lineno)d"
-                             " %(levelname)s: %(message)s")
-handler = logging.StreamHandler()
-handler.setFormatter(formatter)
-
-logger = logging.getLogger()
-logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
-#logger.setLevel(logging.INFO)
-
-
-cnt = lambda: (len(ldtools.Origin.objects.all()),
-               len(ldtools.Resource.objects.all()))
-
-def one(set):
-    l = list(set)
-    assert len(l) == 1
-    return l[0]
+Origin.objects.reset_store(); Resource.objects.reset_store()
+import ipdb #; ipdb.set_trace() # overwrites sys.excepthook
+logger = ldtools.utils.set_logger(2)
+cnt = lambda: (len(Origin.objects.all()), len(Resource.objects.all()))
 
 def pprint_resource(resource):
     import copy

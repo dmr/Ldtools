@@ -75,6 +75,50 @@ def my_graph_diff(graph1, graph2):
         print u"Only in second", unicode(sorted_second)
 
 
+def set_logger(verbosity_level):
+    class ColoredFormatter(logging.Formatter):
+        def format(self, record):
+            BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
+            #The background is set with 40 plus the number of the color, and
+            # the foreground with 30
+            #These are the sequences need to get colored ouput
+            RESET_SEQ = "\033[0m"
+            COLOR_SEQ = "\033[1;%dm"
+            BOLD_SEQ = "\033[1m"
+            COLORS = {'DEBUG': BLUE,'INFO': MAGENTA,
+                'WARNING': YELLOW,'CRITICAL': YELLOW,'ERROR': RED}
+            if record.levelname in COLORS:
+                record.levelname = COLOR_SEQ % (30 + COLORS[record.levelname]) + \
+                                  record.levelname + RESET_SEQ
+            record.msg = unicode(record.msg)
+            record.msg = COLOR_SEQ % (30 + GREEN) + record.msg + RESET_SEQ
+            return logging.Formatter.format(self, record)
+    formatter = ColoredFormatter("%(asctime)s %(name)s %(funcName)s:%(lineno)d"
+                                 " %(levelname)s: %(message)s")
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+
+    logger = logging.getLogger()
+    logger.addHandler(handler)
+
+
+    logger2 = logging.getLogger("ldtools._add_property")
+    logger2.setLevel(logging.INFO)
+
+
+    mapper = {1: logging.DEBUG,
+              2: logging.INFO,
+              3: logging.WARNING,
+              4: logging.ERROR,
+              5: None}
+    try:
+        log_level = mapper[verbosity_level]
+    except KeyError:
+        log_level = mapper[2]
+    if log_level:
+        logger.setLevel(log_level)
+    return logger
+
 
 def is_valid_url(uri):
     parsed = urlparse.urlparse(uri)
