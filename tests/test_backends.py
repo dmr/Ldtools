@@ -97,12 +97,12 @@ class RestBackendTestCase(unittest2.TestCase):
 
     def test_GET_xml(self):
         uri = "http://dbpedia.org/resource/Karlsruhe"
-        try:
-            data = self.BACKEND.GET(uri,
-                # will replace Accept headers
-                extra_headers={'Accept':('application/rdf+xml')})
-        except urllib2.HTTPError as e:
-            raise
+
+        # might fail in dbpedia.org doesn't want to answer
+        data = self.BACKEND.GET(uri,
+            # will replace Accept headers
+            extra_headers={'Accept':('application/rdf+xml')})
+
         self.assertEqual(self.BACKEND.format, "xml")
         print data
         self.assert_(data.startswith("<?xml "))
