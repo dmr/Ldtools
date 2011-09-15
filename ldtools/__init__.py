@@ -160,7 +160,7 @@ class ResourceManager(Manager):
 
         # TODO: make this configurable
         if not origin.has_unsaved_changes():
-            origin.GET(only_follow_uris=[])
+            origin.GET(only_follow_uris=[], raise_errors=False)
 
         authoritative_resource = self.get(uri=uri, origin=origin)
         return authoritative_resource
@@ -397,9 +397,10 @@ class OriginManager(Manager):
 
         return super(OriginManager, self).get(pk=uri)
 
-    def get_or_create(self, uri, **kwargs):
-        if not uri == hash_to_slash_uri(uri):
-            logger.error("URI is not a slash URI: %s" % uri)
+    def get_or_create(self, uri, fail_silently=True,
+                      **kwargs #TODO: remove kwargs for better api
+                      ):
+
         uri = utils.get_rdflib_uriref(uri)
         if not uri == utils.hash_to_slash_uri(uri):
             msg = "URI is not a slash URI: %s" % uri
@@ -410,7 +411,7 @@ class OriginManager(Manager):
 
         try:
             if kwargs:
-                logger.warning("kwargs not supportet in get")
+                logger.warning("kwargs are ignored for get.")
             return self.get(uri), False
         except self.model.DoesNotExist:
             return self.create(uri, **kwargs), True
@@ -418,8 +419,9 @@ class OriginManager(Manager):
     @catchKeyboardInterrupt
     def GET_all(self, depth=2, **kwargs):
         """Crawls or Re-Crawls all Origins. Passes Arguments to GET"""
+
         # TODO: limit crawling speed
-        assert depth<5
+
         func = lambda origin: True if not origin.processed else False
         for _i in range(depth):
             crawl = filter(func, self.all())
