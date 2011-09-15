@@ -297,6 +297,26 @@ class Resource(Model):
 
     def _tripleserialize_iterator(self,
                                   namespace_dict):
+
+        def do_yield(resource, property, v):
+            if isinstance(v, resource.__class__):
+                # If object is referenced in attribute, "de-reference"
+                return ((resource._uri, property, v._uri))
+            else:
+
+                if not hasattr(v, "n3"):
+                    # print only newly added values without the correct
+                    # type are handled here
+
+                    if (hasattr(v, "startswith") # float has no attribute startswith
+                        and v.startswith("http://") # TODO: this is not very accurate!
+                        ):
+                        v = rdflib.URIRef(v)
+                    else:
+                        v = rdflib.Literal(v)
+
+                return ((self._uri, property, v))
+
         for property, values in self.__dict__.items():
 
             # skip internals
@@ -308,27 +328,15 @@ class Resource(Model):
             else:
                 property = pyattr2predicate(property, namespace_dict)
 
-            assert hasattr(property, "n3"), \
-                "property %s is not a rdflib object" % property
+            assert isinstance(property, rdflib.URIRef), \
+                "property %s is not a URIRef object" % property
 
             if isinstance(values, set):
                 for v in values:
-                    if isinstance(v, self.__class__):
-                        # If object is referenced in attribute, "de-reference"
-                        yield((self._uri, property, v._uri))
-                    else:
-                        if not hasattr(v, "n3"):
-                            v = convert_to_rdflib_object(v)
-                        yield((self._uri, property, v))
+                    yield do_yield(self, property, v)
             else:
                 v = values
-                if isinstance(v, self.__class__):
-                    # If object is referenced in attribute, "de-reference"
-                    yield((self._uri, property, v._uri))
-                else:
-                    if not hasattr(v, "n3"):
-                        v = convert_to_rdflib_object(v)
-                    yield((self._uri, property, v))
+                yield do_yield(self, property, v)
 
     def __setattr__(self, key, value):
         if key == "_has_changes":
