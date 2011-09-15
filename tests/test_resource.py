@@ -46,8 +46,14 @@ class ResourceManagerGetFilter(unittest2.TestCase):
                                             BACKEND=ldtools.MemoryBackend())
         self.origin.GET()
 
-    def test_manager_create(self):
-        resource = Resource.objects.create("#me", origin=self.origin)
+    def test_manager_create_relative_fails(self):
+        self.assertRaises(ValueError, Resource.objects.create, "#me",
+                          origin=self.origin)
+
+    def test_manager_create_absolute(self):
+        uri = ldtools.utils.build_absolute_url(url=self.origin.uri,
+                                               fragment="#me")
+        resource = Resource.objects.create(uri, origin=self.origin)
         assert str(resource._uri) == self.origin.uri + "#me"
         assert len(Resource.objects.all()) == 1
 
