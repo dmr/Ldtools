@@ -375,17 +375,16 @@ class Resource(Model):
 
 class OriginManager(Manager):
 
-    def create_hook(self, uri):
-        assert not '#' in uri, ("HashURI not allowed as Origin: %s" % uri)
-
     def post_create_hook(self, origin):
         # hook to be overwritten but using application
         # origin.timedelta = datetime.timedelta(minutes=2)
         return origin
 
     def create(self, uri, BACKEND=None):
-        self.create_hook(uri)
         uri = utils.get_rdflib_uriref(uri)
+
+        assert not '#' in uri, ("HashURI not allowed as Origin: %s" % uri)
+
         backend = BACKEND if BACKEND else RestBackend()
         origin = super(OriginManager, self).create(pk=uri, uri=uri,
                                                  backend=backend)
