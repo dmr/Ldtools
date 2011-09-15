@@ -17,7 +17,12 @@ setup(
     long_description=README,
     packages=find_packages(),
 
-    install_requires=["rdflib"],
+    scripts=['scripts/ldtools'],
+
+    install_requires=[
+        "rdflib",
+        "argparse",
+    ],
 
     extras_require={
         'tests': ["nose", "unittest2",],
