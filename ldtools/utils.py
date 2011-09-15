@@ -1,14 +1,15 @@
 import rdflib
 from rdflib import compare
 import logging
+import urlparse
 
 logger = logging.getLogger("ldtools")
-
 
 def my_graph_diff(graph1, graph2):
     """Compares graph2 to graph1 and highlights everything that changed.
     Colored if pygments available"""
 
+    logger = logging.getLogger("ldtools")
     import difflib
 
     # quick fix for wrong type
@@ -72,3 +73,42 @@ def my_graph_diff(graph1, graph2):
     except UnicodeDecodeError:
         print u"Only in first", unicode(sorted_first)
         print u"Only in second", unicode(sorted_second)
+
+
+class UriNotValid(Exception):
+    "Given Uri is not valid"
+    silent_variable_failure = True
+
+
+def get_rdflib_uriref(uri):
+    """Returns Uri that is valid and canonalized or raises Exception"""
+    if not uri:
+        raise UriNotValid("uri is None")
+
+    # TODO: implement canonalization: cut port 80, lowercase domain,
+    # http and https is equal. Problem: graph comparison
+
+    # Workaround for rdflib's handling of BNodes
+    if isinstance(uri, rdflib.BNode):
+        return uri
+
+    if isinstance(uri, rdflib.Literal):
+        raise UriNotValid("Cannot convert Literals")
+
+    if isinstance(uri, rdflib.URIRef):
+        uriref = uri
+    else:
+        if logger:
+            logger.debug(u"Converting %s to URIRef" % uri)
+        uriref = rdflib.URIRef(uri)
+
+    # check if uri is valid
+    # TODO: maybe not constrain here but at export?
+    # TODO: move to "is_valid_uri" and delete here
+    if not uriref.encode('utf8'):
+        raise UriNotValid("Not valid: %s" % uriref)
+    if uriref.startswith('#'):
+        raise UriNotValid("%s starts with '#'. Check your Parser" % uriref)
+
+    return uriref
+

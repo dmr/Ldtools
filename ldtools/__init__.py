@@ -40,33 +40,6 @@ def catchKeyboardInterrupt(func):
     return dec
 
 
-def canonalize_uri(uriref):
-    """Returns Uri that is valid and canonalized or raises Exception"""
-    if not uriref:
-        raise UriNotValid("uri is None")
-
-    # TODO: implement canonalization: cut port 80, lowercase domain,
-    # http and https is equal. Problem: graph comparison
-
-    # Workaround for rdflib's handling of BNodes
-    if isinstance(uriref, rdflib.BNode):
-        return uriref
-
-    assert not isinstance(uriref, rdflib.Literal)
-
-    if not uriref.encode('utf8'):
-        raise UriNotValid("Not valid: %s" % uriref)
-
-    if not hasattr(uriref, "n3"):
-        logger.debug(u"Converting %s to URIRef" % uriref)
-        uriref = rdflib.URIRef(uriref)
-
-    if uriref.startswith('#'):
-        raise UriNotValid("%s starts with '#'. Check your Parser" % uriref)
-
-    return uriref
-
-
 def hash_to_slash_uri(uri):
     """Converts Hash to Slash uri http://www.w3.org/wiki/HashURI"""
     if not isinstance(uri, rdflib.URIRef):
@@ -162,6 +135,7 @@ class ResourceManager(Manager):
         return origin_uri+uri
 
     def create(self, uri, origin, **kwargs):
+
         assert isinstance(origin, Origin), "Origin instance required"
         assert origin.processed, ("Origin has to be processed "
             "before creating more Resource objects: origin.GET()")
@@ -172,7 +146,14 @@ class ResourceManager(Manager):
                 "BNode not allowed to start with #"
             uri = rdflib.URIRef(origin.uri + uri)
 
-        uri = canonalize_uri(uri)
+        if isinstance(uri, (rdflib.BNode, rdflib.URIRef)):
+            pass
+        elif not utils.is_valid_url(uri):
+            msg = "URI %s not a valid URL" % uri
+            logger.error(msg)
+            raise ValueError(msg)
+
+        uri = utils.get_rdflib_uriref(uri)
 
         pk = self.get_pk(origin_uri=origin.uri, uri=uri)
         return super(ResourceManager, self).create(
@@ -181,8 +162,11 @@ class ResourceManager(Manager):
     def get_authoritative_resource(self, uri,
                                    create_nonexistent_origin=True):
         """Tries to return the Resource object from the original origin"""
-        uri = canonalize_uri(uri)
         origin_uri = rdflib.URIRef(hash_to_slash_uri(uri))
+        if not utils.is_valid_url(uri):
+            logger.error("Not a valid Uri: %s" % uri)
+            return
+        uri = utils.get_rdflib_uriref(uri)
 
         authoritative_origin = Origin.objects.filter(uri=origin_uri)
         authoritative_origin_list = list(authoritative_origin)
@@ -213,7 +197,8 @@ class ResourceManager(Manager):
         --> If DoesNotExist occurs Resources with uri might still
         exist but no validated Resources exist.
         """
-        uri = canonalize_uri(uri)
+
+        uri = utils.get_rdflib_uriref(uri)
 
         if not origin:
             filter_result = list(self.filter(_uri=uri))
@@ -237,7 +222,8 @@ class ResourceManager(Manager):
         assert 0, "implement!"
 
     def get_or_create(self, uri, origin=None):
-        uri = canonalize_uri(uri)
+
+        uri = utils.get_rdflib_uriref(uri)
         try:
             return self.get(uri=uri, origin=origin), False
         except self.model.DoesNotExist:
@@ -410,8 +396,8 @@ class OriginManager(Manager):
         return origin
 
     def create(self, uri, BACKEND=None):
-        uri = canonalize_uri(uri)
         self.create_hook(uri)
+        uri = utils.get_rdflib_uriref(uri)
         backend = BACKEND if BACKEND else RestBackend()
         origin = super(OriginManager, self).create(pk=uri, uri=uri,
                                                  backend=backend)
@@ -419,13 +405,15 @@ class OriginManager(Manager):
 
     def get(self, uri, **kwargs):
         """Retrieves Origin object from Store"""
-        uri = canonalize_uri(uri)
+
+        uri = utils.get_rdflib_uriref(uri)
+
         return super(OriginManager, self).get(pk=uri)
 
     def get_or_create(self, uri, **kwargs):
-        uri = canonalize_uri(uri)
         if not uri == hash_to_slash_uri(uri):
             logger.error("URI is not a slash URI: %s" % uri)
+        uri = utils.get_rdflib_uriref(uri)
         try:
             if kwargs:
                 logger.warning("kwargs not supportet in get")
@@ -586,7 +574,6 @@ class Origin(Model):
             else:
                 logging.warning("GET retrieved updates for %s!" % self.uri)
                 try:
-                    import utils
                     utils.my_graph_diff(self._graph, graph)
                 except ImportError:
                     pass
@@ -716,7 +703,8 @@ class GraphHandler(object):
 
         for subject, predicate, obj_ect in graph:
             assert hasattr(subject, "n3")
-            #subject = canonalize_uri(subject)
+
+            #subject = utils.get_rdflib_uriref(subject)
 
             #if isinstance(subject, rdflib.BNode):
             #    assert 0, "subject is BNode: %s %s %s" % (subject, predicate, obj_ect)
