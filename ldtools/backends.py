@@ -2,10 +2,6 @@
 __version__ = "0.5.3"
 __useragent__ = ('ldtools-%s (http://github.com/dmr/ldtools, daniel@nwebs.de)'
                  % __version__)
-headers = {'User-agent': __useragent__,
-           'Accept':('text/n3;q=1,'
-                     'application/rdf+xml,text/rdf+n3;q=0.9,'
-                     'application/xhtml+xml;q=0.5, */*;q=0.1')}
 
 import datetime
 import logging
@@ -19,6 +15,8 @@ import glob
 
 # add n3 to known mimetypes
 mimetypes.add_type("text/n3", ".n3")
+mimetypes.add_type("text/rdf+n3", ".n3")
+
 
 class FiletypeMappingError(Exception): pass
 class ContentNegotiationError(Exception): pass
@@ -57,8 +55,23 @@ class AbstractBackend(object):
 
 
 class RestBackend(AbstractBackend):
+    GET_headers = {
+        'User-agent': __useragent__,
+        'Accept': (
+            'text/n3,'
+            'text/rdf+n3,'
+            'application/rdf+xml;q=0.8'
+            #'application/xhtml+xml;q=0.5'
+            #'*/*;q=0.1'
+            #XHTML+RDFa
+        )
+    }
 
-    def GET(self, uri):
+    PUT_headers={
+        "User-Agent": __useragent__,
+    }
+
+    def GET(self, uri, extra_headers=None, debug=False):
         """lookup URI"""
         # TODO: do friendly crawling: use robots.txt speed
         # limitation definitions
@@ -70,11 +83,26 @@ class RestBackend(AbstractBackend):
                 raise Exception("You cannot pass different uris to the same "
                                 "backend")
 
-        request = urllib2.Request(url=self.uri, headers=headers)
+        if debug:
+            handler=urllib2.HTTPHandler(debuglevel=1)
+            opener = urllib2.build_opener(handler)
+        else:
+            opener = urllib2.build_opener()
 
-        opener = urllib2.build_opener() #SmartRedirectHandler())
+        if extra_headers:
+            self.GET_headers.update(extra_headers)
+
+        request = urllib2.Request(url=uri, headers=self.GET_headers)
+
         result_file = opener.open(request)
 
+        if result_file.geturl() != uri:
+            logger.info("%s was redirected. Content url: %r" % (uri,
+                                                     result_file.geturl()))
+
+        if "Content-Length" in result_file.headers:
+            logger.info("Content-Length: %s"
+                        % result_file.headers["Content-Length"])
 
         if not "Content-Type" in result_file.headers:
             raise FiletypeMappingError("No Content-Type specified in response")
@@ -111,20 +139,22 @@ class RestBackend(AbstractBackend):
     def PUT(self, data):
         assert self.uri, "GET has to be called before PUT possible"
 
+        self.PUT_headers.update({
+            "Content-Type": self.content_type,
+            "Content-Length": str(len(data)),
+        })
+
         # TODO: authentication? oauth?
         #h = httplib2.Http()
         #h.add_credentials('name', 'password')
         #resp, content = h.request(uri, "PUT", body=data, headers=headers)
         #if resp.status != 200: raise Error(resp.status, errmsg, headers)
         #return resp, content
-        headers={"content-type": self.content_type,
-                 "User-Agent": __useragent__,
-                 "Content-Length": str(len(data))}
 
         opener = urllib2.build_opener(urllib2.HTTPHandler)
         request = urllib2.Request(self.uri,
                                   data=data,
-                                  headers=headers)
+                                  headers=self.PUT_headers)
         request.get_method = lambda: 'PUT'
         response = opener.open(request)
         # assert status_code 200, 201?
@@ -139,11 +169,9 @@ class FileBackend(AbstractBackend):
         assert os.path.exists(filename)
 
         format = format if format else guess_format_from_filename(filename)
-        if assure_parser_plugin_exists(format):
-            self.format = format
-        else:
-            logger.error("No format set!")
+        assure_parser_plugin_exists(format)
 
+        self.format = format
         self.filename = filename
 
     def GET(self, uri):
@@ -189,6 +217,7 @@ class FileBackend(AbstractBackend):
 class MemoryBackend(AbstractBackend):
     def __init__(self, data=None, format="xml"):
         self.data = data if data else ""
+        assure_parser_plugin_exists(format)
         self.format = format
 
     def GET(self, uri):
