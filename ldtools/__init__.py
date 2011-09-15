@@ -725,7 +725,7 @@ class GraphHandler(object):
 
                 if type(obj_ect) == rdflib.URIRef:
                     if utils.is_valid_url(obj_ect):
-                        obj_uriref = utils.hash_to_slash_uri(obj_ect, logger=logger)
+                        obj_uriref = utils.hash_to_slash_uri(obj_ect)
                         Origin.objects.get_or_create(uri=obj_uriref)
 
             resource, _created = Resource.objects.get_or_create(uri=subject,
