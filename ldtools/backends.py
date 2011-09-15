@@ -23,14 +23,6 @@ logger = logging.getLogger("ldtools")
 
 
 def get_file_extension(filename):
-    """
-    >>> get_file_extension("test.xml")
-    'xml'
-    >>> get_file_extension("test.1234123.xml")
-    'xml'
-    >>> get_file_extension("test")
-    ''
-    """
     extension = filename.split(".")[1:][-1:]
     return str(extension[0]) if extension else ""
 

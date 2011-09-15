@@ -6,14 +6,17 @@ import rdflib
 from rdflib import compare
 
 import ldtools
+from ldtools.backends import get_file_extension
 
 
 class StandardBackendReturnsRdflibGraphTestMixin(object):
     """Basis to assure we can use local resources in all other tests.
     Tests which functions the backend offers"""
     def test_GET(self):
+
         uri = "http://xmlns.com/foaf/0.1/"
         data = self.BACKEND.GET(uri)
+
         #except urllib2.HTTPError as e:
         #    if e.code in [
         #            401,
@@ -70,8 +73,13 @@ class MemoryBackendTestCase(unittest2.TestCase,
         self.BACKEND = ldtools.MemoryBackend(data)
 
 
+class GetFileExtensionTestCase(unittest2.TestCase):
+    def test_get_file_extension(self):
+        for file_name, extension in [
+            ("test.xml", "xml"),
+            ("test.1234123.xml", "xml"),
+            ("test", ""),
+            ("test.", ""),
+        ]:
+            self.assertEqual(get_file_extension(file_name), extension)
 
-
-
-
-# RestBackend!
