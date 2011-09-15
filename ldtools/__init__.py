@@ -117,11 +117,6 @@ class ResourceManager(Manager):
         assert origin.processed, ("Origin has to be processed "
             "before creating more Resource objects: origin.GET()")
 
-        # Absolutize relative URIs
-        if uri.startswith("#"):
-            assert not isinstance(uri, rdflib.BNode), \
-                "BNode not allowed to start with #"
-            uri = rdflib.URIRef(origin.uri + uri)
 
         if isinstance(uri, (rdflib.BNode, rdflib.URIRef)):
             pass
