@@ -7,19 +7,17 @@ import mimetypes
 import rdflib
 import socket
 import urlparse
-from rdflib.namespace import split_uri
-from rdflib import compare
 from xml.sax._exceptions import SAXParseException
 
-# socket timeout set to 5 seconds globally
-socket.setdefaulttimeout(5)
+from rdflib.namespace import split_uri
+from rdflib import compare
+
+import utils
+
+# set socket timeout. URLError will occur
+socket.setdefaulttimeout(20)
 
 logger = logging.getLogger(__name__)
-
-
-class UriNotValid(Exception):
-    "Given Uri is not valid"
-    silent_variable_failure = True
 
 
 def safe_dict(d):
