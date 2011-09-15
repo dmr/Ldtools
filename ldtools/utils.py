@@ -75,6 +75,22 @@ def my_graph_diff(graph1, graph2):
         print u"Only in second", unicode(sorted_second)
 
 
+
+def is_valid_url(uri):
+    parsed = urlparse.urlparse(uri)
+
+    if not parsed.scheme in ["http", "https"]:
+        logging.error("wrong scheme %s" % parsed.scheme)
+        return False
+
+    uri = urlparse.urlunparse((parsed.scheme, parsed.netloc, parsed.path,
+                         parsed.params, parsed.query,""))
+
+    if not "http" in uri:
+        return False
+    return True
+
+
 class UriNotValid(Exception):
     "Given Uri is not valid"
     silent_variable_failure = True
@@ -112,3 +128,32 @@ def get_rdflib_uriref(uri):
 
     return uriref
 
+
+def hash_to_slash_uri(uri):
+    """Converts Hash to Slash uri http://www.w3.org/wiki/HashURI"""
+    assert isinstance(uri, rdflib.URIRef)
+
+    parsed = urlparse.urlparse(uri)
+
+    assert parsed.scheme in ["http", "https"], parsed.scheme
+
+    uri = urlparse.urlunparse((parsed.scheme, parsed.netloc, parsed.path,
+                         parsed.params, parsed.query,""))
+    assert is_valid_url(uri)
+    return rdflib.URIRef(uri)
+
+
+def build_absolute_url(url, fragment):
+    assert fragment.startswith("#"), fragment
+    assert isinstance(url, rdflib.URIRef)
+
+    parsed = urlparse.urlparse(url)
+    print parsed
+    if parsed.fragment:
+        raise ValueError("Cannot add fragment to HashURI: %s + %s?"
+                         % (url, fragment))
+    url = urlparse.urlunparse((parsed.scheme, parsed.netloc,
+        parsed.path if parsed.path else "/",
+        parsed.params, parsed.query, fragment.strip("#")))
+    assert is_valid_url(url)
+    return rdflib.URIRef(url)

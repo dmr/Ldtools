@@ -40,29 +40,6 @@ def catchKeyboardInterrupt(func):
     return dec
 
 
-def hash_to_slash_uri(uri):
-    """Converts Hash to Slash uri http://www.w3.org/wiki/HashURI"""
-    if not isinstance(uri, rdflib.URIRef):
-        logger.error("Cannot analyse %s (type %s)" % (uri, type(uri)))
-        return uri
-
-    parsed = urlparse.urlparse(uri)
-    uri = urlparse.urlunparse((parsed.scheme, parsed.netloc, parsed.path,
-                         parsed.params, parsed.query,""))
-    return uri
-
-
-def convert_to_rdflib_object(v):
-    if hasattr(v, "n3"):
-        return v
-
-    if hasattr(v, "startswith") and v.startswith("http://"):
-        # float has no attribute startswith
-        return rdflib.URIRef(v)
-    else:
-        return rdflib.Literal(v)
-
-
 def reverse_dict(dct):
     res = {}
     for k,v in dct.iteritems():
@@ -162,11 +139,13 @@ class ResourceManager(Manager):
     def get_authoritative_resource(self, uri,
                                    create_nonexistent_origin=True):
         """Tries to return the Resource object from the original origin"""
-        origin_uri = rdflib.URIRef(hash_to_slash_uri(uri))
+
         if not utils.is_valid_url(uri):
             logger.error("Not a valid Uri: %s" % uri)
             return
         uri = utils.get_rdflib_uriref(uri)
+
+        origin_uri = utils.hash_to_slash_uri(uri)
 
         authoritative_origin = Origin.objects.filter(uri=origin_uri)
         authoritative_origin_list = list(authoritative_origin)
@@ -253,11 +232,12 @@ class Resource(Model):
         if isinstance(self._uri, rdflib.BNode):
             return True
 
-        if hash_to_slash_uri(self._uri) == str(self._origin.uri):
+        if utils.hash_to_slash_uri(self._uri) == self._origin.uri:
             return True
 
     def _add_property(self, predicate, object,
                       namespace_short_notation_reverse_dict):
+
         assert isinstance(predicate, rdflib.URIRef),\
             "Not an URIRef: %s"%predicate
         assert hasattr(predicate, "n3"),\
@@ -414,6 +394,13 @@ class OriginManager(Manager):
         if not uri == hash_to_slash_uri(uri):
             logger.error("URI is not a slash URI: %s" % uri)
         uri = utils.get_rdflib_uriref(uri)
+        if not uri == utils.hash_to_slash_uri(uri):
+            msg = "URI is not a slash URI: %s" % uri
+            if fail_silently:
+                logger.error(msg)
+                return None, None
+            else: raise Exception(msg)
+
         try:
             if kwargs:
                 logger.warning("kwargs not supportet in get")
@@ -720,7 +707,8 @@ class GraphHandler(object):
                 if (predicate == rdflib.OWL.imports
                     and type(obj_ect) == rdflib.URIRef):
 
-                    uri = hash_to_slash_uri(obj_ect)
+                    uri = utils.hash_to_slash_uri(obj_ect)
+
                     origin, created = Origin.objects.get_or_create(uri=uri)
 
                     logger.info("Interrupting to process owl:imports %s"
@@ -730,9 +718,11 @@ class GraphHandler(object):
             if ((self.only_follow_uris is not None
                  and predicate in self.only_follow_uris)
                 or self.only_follow_uris is None):
+
                 if type(obj_ect) == rdflib.URIRef:
-                    obj_uriref = hash_to_slash_uri(obj_ect)
-                    Origin.objects.get_or_create(uri=obj_uriref)
+                    if utils.is_valid_url(obj_ect):
+                        obj_uriref = utils.hash_to_slash_uri(obj_ect, logger=logger)
+                        Origin.objects.get_or_create(uri=obj_uriref)
 
             resource, _created = Resource.objects.get_or_create(uri=subject,
                                                         origin=self.origin)
