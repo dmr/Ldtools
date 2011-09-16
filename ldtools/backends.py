@@ -96,9 +96,15 @@ class RestBackend(AbstractBackend):
         if extra_headers:
             self.GET_headers.update(extra_headers)
 
+        reference_time = datetime.datetime.now()
+
         request = urllib2.Request(url=uri, headers=self.GET_headers)
 
         result_file = opener.open(request)
+
+
+        now = datetime.datetime.now()
+        self.lookup_time = now - reference_time
 
         if result_file.geturl() != uri:
             logger.info("%s was redirected. Content url: %r" % (uri,

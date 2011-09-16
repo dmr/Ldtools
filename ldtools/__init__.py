@@ -519,9 +519,15 @@ class Origin(Model):
                 # Important: Do not pass data=data without publicID=uri because
                 # relative URIs (#deri) won't be an absolute uri in that case!
                 publicID = self.uri
+
+                reference_time = datetime.datetime.now()
+
                 graph.parse(data=data,
                             publicID=publicID,
                             format=self.backend.format)
+
+                now = datetime.datetime.now()
+                self.graph_parse_time = now - reference_time
 
                 # normal rdflib.compare does not work correctly with
                 # ConjunctiveGraph, unless there is only one graph within that
@@ -696,6 +702,8 @@ class GraphHandler(object):
         namespace_short_notation_reverse_dict = reverse_dict(dict(graph\
             .namespace_manager.namespaces()))
 
+        reference_time = datetime.datetime.now()
+
         for subject, predicate, obj_ect in graph:
             assert hasattr(subject, "n3")
 
@@ -736,6 +744,9 @@ class GraphHandler(object):
                                                         origin=self.origin)
             resource._add_property(predicate, obj_ect,
                                    namespace_short_notation_reverse_dict)
+
+        now = datetime.datetime.now()
+        self.origin.graph_handler_time = now - reference_time
 
         for resource in self.origin.get_resources():
             resource._has_changes = False
