@@ -455,6 +455,8 @@ class Origin(Model):
             handle_owl_imports=False,
             skip_urls=None,
             raise_errors=True,
+
+            backend_httphandler=None,
             ):
 
         if not self.uri:
@@ -483,10 +485,12 @@ class Origin(Model):
                 logger.info("Not processing %s again because was processed "
                 "only %s ago" % (self.uri, time_since_last_processed))
                 return
+
         self.stats['last_processed'] = now
 
         try:
-            data = self.backend.GET(self.uri)
+            data = self.backend.GET(self.uri,
+                                    backend_httphandler=backend_httphandler)
         except urllib2.HTTPError as e:
             if e.code in [
                     401,

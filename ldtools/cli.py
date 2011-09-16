@@ -100,7 +100,9 @@ def main():
 
         if results.only_negotiate:
             try:
-                data = origin.backend.GET(uri=origin.uri, debug=True)
+                import urllib2
+                data = origin.backend.GET(uri=origin.uri,
+                    backend_httphandler=urllib2.HTTPHandler(debuglevel=1))
             except Exception as e:
                 print e.message
         else:

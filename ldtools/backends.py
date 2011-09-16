@@ -50,9 +50,7 @@ def guess_format_from_filename(file_name):
 
 class AbstractBackend(object):
     """Abstract Backend. Overwrite in subclasses"""
-    def GET(self, uri): raise NotImplementedError
-    def PUT(self): raise NotImplementedError
-
+    pass
 
 class RestBackend(AbstractBackend):
     GET_headers = {
@@ -71,7 +69,11 @@ class RestBackend(AbstractBackend):
         "User-Agent": __useragent__,
     }
 
-    def GET(self, uri, extra_headers=None, debug=False):
+    def GET(self,
+            uri,
+            extra_headers=None,
+            backend_httphandler=None,
+        ):
         """lookup URI"""
         # TODO: do friendly crawling: use robots.txt speed
         # limitation definitions
@@ -83,9 +85,11 @@ class RestBackend(AbstractBackend):
                 raise Exception("You cannot pass different uris to the same "
                                 "backend")
 
-        if debug:
-            handler=urllib2.HTTPHandler(debuglevel=1)
-            opener = urllib2.build_opener(handler)
+        if backend_httphandler:
+            if isinstance(backend_httphandler, list):
+                opener = urllib2.build_opener(*backend_httphandler)
+            else:
+                opener = urllib2.build_opener(backend_httphandler)
         else:
             opener = urllib2.build_opener()
 
@@ -174,7 +178,13 @@ class FileBackend(AbstractBackend):
         self.format = format
         self.filename = filename
 
-    def GET(self, uri):
+    def GET(self,
+            uri,
+            extra_headers=None,
+            backend_httphandler=None,
+            ):
+        assert not extra_headers, "Not Implemented"
+        assert not backend_httphandler, "Not Implemented"
         if not hasattr(self, "uri"):
             self.uri = uri
         else:
@@ -220,7 +230,13 @@ class MemoryBackend(AbstractBackend):
         assure_parser_plugin_exists(format)
         self.format = format
 
-    def GET(self, uri):
+    def GET(self,
+            uri,
+            extra_headers=None,
+            backend_httphandler=None,
+            ):
+        assert not extra_headers, "Not Implemented"
+        assert not backend_httphandler, "Not Implemented"
         return self.data
 
     def PUT(self, data):
