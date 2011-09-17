@@ -16,6 +16,7 @@ class ParserTestCase(unittest2.TestCase):
             sockettimeout=None,
             only_negotiate=False,
             only_print_uri_content=False,
+            GRAPH_SIZE_LIMIT=None,
         )
 
     def _check_equals(self, str, result):

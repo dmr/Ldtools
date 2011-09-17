@@ -53,6 +53,9 @@ def get_parser():
         help='Only do content negotiation for given URIs and print the '
              'response headers')
 
+    parser.add_argument('--GRAPH_SIZE_LIMIT', action="store", type=int,
+        help="Set maximum graph size that will be processed")
+
     def check_uri(url):
         if not is_valid_url(url):
             raise argparse.ArgumentTypeError("%r is not a valid URL" % url)
@@ -96,6 +99,10 @@ def main():
         socket.setdefaulttimeout(results.sockettimeout)
 
 
+    kw = dict(raise_errors=False)
+    if results.GRAPH_SIZE_LIMIT:
+        kw["GRAPH_SIZE_LIMIT"] = results.GRAPH_SIZE_LIMIT
+
     for url in results.url:
         url = hash_to_slash_uri(rdflib.URIRef(url))
         logger.info("Retrieving content of %s" % url)
@@ -122,7 +129,7 @@ def main():
                 print e
 
         else:
-            origin.GET(only_follow_uris=only_follow_uris, raise_errors=False)
+            origin.GET(only_follow_uris=only_follow_uris, **kw)
 
     if results.only_negotiate or results.only_print_uri_content:
         sys.exit(0)
@@ -130,14 +137,14 @@ def main():
     if results.depth:
         for round in range(results.depth):
             for origin in Origin.objects.all():
-                origin.GET(only_follow_uris=only_follow_uris,
-                           raise_errors=False)
+                origin.GET(only_follow_uris=only_follow_uris, **kw)
 
     all_resources = Resource.objects.all()
     if (len(all_resources) > results.print_detailled_resources_limit
         or results.only_print_uris):
         logger.warning("ldtools discovered more than %s Resource objects, "
-            "only printing titles" % results.print_detailled_resources_limit)
+            "only printing titles of the %s Resources discovered"
+            % (results.print_detailled_resources_limit, len(all_resources)))
         for resource in all_resources:
             print resource
     else:
