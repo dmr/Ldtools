@@ -18,8 +18,10 @@ mimetypes.add_type("text/n3", ".n3")
 mimetypes.add_type("text/rdf+n3", ".n3")
 
 
-class FiletypeMappingError(Exception): pass
-class ContentNegotiationError(Exception): pass
+class FiletypeMappingError(Exception):
+    pass
+class ContentNegotiationError(Exception):
+    pass
 
 
 logger = logging.getLogger("ldtools")
@@ -37,7 +39,7 @@ def assure_parser_plugin_exists(format):
         rdflib.graph.plugin.get(name=format,
                             kind=rdflib.parser.Parser)
     except rdflib.plugin.PluginException as e:
-        msg = "Not parser plugin found for %s" % format
+        msg = "No parser plugin found for %s" % format
         logger.error(msg)
         raise ContentNegotiationError(msg)
 
