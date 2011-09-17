@@ -12,10 +12,10 @@ import shutil
 import urllib2
 import glob
 
-
-# add n3 to known mimetypes
+# add mimetypes python does not know yet
 mimetypes.add_type("text/n3", ".n3")
 mimetypes.add_type("text/rdf+n3", ".n3")
+mimetypes.add_type("text/turtle", ".n3")
 
 
 class FiletypeMappingError(Exception):
@@ -33,8 +33,6 @@ def get_file_extension(filename):
 
 
 def assure_parser_plugin_exists(format):
-    # TODO: double check if parser for format exists -->
-    # TODO: move parser to backend
     try:
         rdflib.graph.plugin.get(name=format,
                             kind=rdflib.parser.Parser)
@@ -61,6 +59,7 @@ class RestBackend(AbstractBackend):
             'text/n3,'
             'text/rdf+n3,'
             'application/rdf+xml;q=0.8'
+            "text/turtle;q=0.7,"
             #'application/xhtml+xml;q=0.5'
             #'*/*;q=0.1'
             #XHTML+RDFa
@@ -76,9 +75,7 @@ class RestBackend(AbstractBackend):
             extra_headers=None,
             backend_httphandler=None,
         ):
-        """lookup URI"""
-        # TODO: do friendly crawling: use robots.txt speed
-        # limitation definitions
+        """Lookup URI and follow redirects. Return data"""
 
         if not hasattr(self, "uri"):
             self.uri = uri
@@ -104,7 +101,6 @@ class RestBackend(AbstractBackend):
 
         result_file = opener.open(request)
 
-
         now = datetime.datetime.now()
         self.lookup_time = now - reference_time
 
@@ -123,8 +119,9 @@ class RestBackend(AbstractBackend):
         # Many servers don't do content negotiation: if one of the following
         # content_types are returned by server, assume the mapped type
         overwrite_content_type_map = {
-            "text/plain": "application/rdf+xml"
+            "text/plain": "application/rdf+xml",
         }
+
         if self.content_type in overwrite_content_type_map:
             self.content_type = overwrite_content_type_map[self.content_type]
 
@@ -138,10 +135,11 @@ class RestBackend(AbstractBackend):
                                    % self.content_type)
 
         format = file_extension.strip(".")
-        if format in ["rdf", "ksh"]:
-            # fix responses that we know are wrong
-            format = "xml"
 
+        # assure format is correct
+        if format in ["rdf", "ksh"]:
+            format = "xml"
+        # check if rdflib parser exists for format
         assure_parser_plugin_exists(format)
 
         self.format = format
@@ -156,26 +154,16 @@ class RestBackend(AbstractBackend):
             "Content-Length": str(len(data)),
         })
 
-        # TODO: authentication? oauth?
-        #h = httplib2.Http()
-        #h.add_credentials('name', 'password')
-        #resp, content = h.request(uri, "PUT", body=data, headers=headers)
-        #if resp.status != 200: raise Error(resp.status, errmsg, headers)
-        #return resp, content
-
         opener = urllib2.build_opener(urllib2.HTTPHandler)
         request = urllib2.Request(self.uri,
                                   data=data,
                                   headers=self.PUT_headers)
         request.get_method = lambda: 'PUT'
         response = opener.open(request)
-        # assert status_code 200, 201?
 
 
 class FileBackend(AbstractBackend):
-    """Manages one xml file --> Uri that the user wants to "PUT" to is not
-    flexible!
-    """
+    """Manages one xml file as a data basis"""
 
     def __init__(self, filename, format=None):
         assert os.path.exists(filename)
