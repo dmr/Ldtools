@@ -43,6 +43,9 @@ def get_parser():
               'will be printed'),
         default=300, type=int)
 
+    parser.add_argument('--only-print-uri-content', action="store_true",
+        help='Only prints data retrieved from URIs and exists')
+
     parser.add_argument('--sockettimeout', action="store", type=int,
         help="Set the socket timeout")
 
@@ -105,10 +108,23 @@ def main():
                     backend_httphandler=urllib2.HTTPHandler(debuglevel=1))
             except Exception as e:
                 print e.message
+
+        elif results.only_print_uri_content:
+            try:
+                import urllib2
+                data = origin.backend.GET(uri=origin.uri,
+                    backend_httphandler=urllib2.HTTPHandler(debuglevel=1))
+                print
+                print data
+                print
+            except Exception as e:
+                print
+                print e
+
         else:
             origin.GET(only_follow_uris=only_follow_uris, raise_errors=False)
 
-    if results.only_negotiate:
+    if results.only_negotiate or results.only_print_uri_content:
         sys.exit(0)
 
     if results.depth:
