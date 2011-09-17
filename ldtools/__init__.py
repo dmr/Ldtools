@@ -465,9 +465,7 @@ class Origin(Model):
             if raise_errors: raise e
             else: return
 
-
         graph = rdflib.graph.ConjunctiveGraph(identifier=self.uri)
-
 
         try:
             if data:
@@ -486,8 +484,6 @@ class Origin(Model):
 
                 # normal rdflib.compare does not work correctly with
                 # ConjunctiveGraph, unless there is only one graph within that
-                assert len(list(graph.contexts())) == 1
-
         except SAXParseException as e:
             self.add_error("SAXParseException")
             logger.error("SAXParseException: %s" % self)
@@ -511,6 +507,10 @@ class Origin(Model):
             delattr(self, "errors")
 
         g_length = len(graph)
+
+        if g_length > 0:
+            assert len(list(graph.contexts())) == 1
+
         if g_length > GRAPH_SIZE_LIMIT:
             logger.error("Maximum graph size exceeded. Thr graph is %s "
                          "triples big. Limit is set to %s. The aquired "
