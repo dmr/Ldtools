@@ -34,16 +34,6 @@ class GraphHandlerTestCase(unittest2.TestCase):
 
         # nothing to assure?
 
-    @attr("failing")
-    def test_recrawl_changed_on_remote(self):
-        assert 0
-        # TODO: modify origin in between --> delete all resources and regenerate
-
-    @attr("failing")
-    def test_recrawl_while_local_changes_error(self):
-        assert 0
-        # TODO: modify origin in between --> delete all resources and regenerate
-
     def test_prevent_recrawl_by_setting_timedelta(self):
 
         old_post_create_hook = ldtools.Origin.objects.post_create_hook
