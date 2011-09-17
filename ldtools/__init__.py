@@ -14,8 +14,8 @@ from rdflib import compare
 
 import utils
 
-# set socket timeout. URLError will occur
-socket.setdefaulttimeout(20)
+# set socket timeout. URLError will occur if time passed
+socket.setdefaulttimeout(30)
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +51,10 @@ def predicate2pyattr(predicate, namespace_short_notation_reverse_dict):
     prefix, propertyname = split_uri(predicate)
     assert prefix
     assert propertyname
+
     #if not "_" in propertyname:
     #    logger.info("%s_%s may cause problems?" % (prefix, propertyname))
+
     if not prefix in namespace_short_notation_reverse_dict:
         logger.warning("%s cannot be shortened" % predicate)
         return predicate
@@ -133,7 +135,7 @@ class ResourceManager(Manager):
 
     def get_authoritative_resource(self, uri,
                                    create_nonexistent_origin=True):
-        """Tries to return the Resource object from the original origin"""
+        """Tries to return the Resource object from the authoritative origin"""
 
         if not utils.is_valid_url(uri):
             logger.error("Not a valid Uri: %s" % uri)
@@ -234,7 +236,7 @@ class Resource(Model):
                       namespace_short_notation_reverse_dict):
 
         assert isinstance(predicate, rdflib.URIRef),\
-            "Not an URIRef: %s"%predicate
+            "Not an URIRef: %s" % predicate
         assert hasattr(predicate, "n3"),\
             "property %s is not a rdflib object" % predicate
 
@@ -265,7 +267,8 @@ class Resource(Model):
                 object._reverse = {}
             if predicate in object._reverse:
                 if not isinstance(object._reverse[predicate], set):
-                    object._reverse[predicate] = set([object._reverse[predicate]])
+                    object._reverse[predicate] = set(
+                        [object._reverse[predicate]])
                 object._reverse[predicate].add(self)
             else:
                 object._reverse[predicate] = self
@@ -280,58 +283,9 @@ class Resource(Model):
         else:
             setattr(self, predicate, object)
             attr = getattr(self, predicate)
-            #assert attr == object
+            assert attr == object
 
-        # TODO: this might cause UnicodeDecodeErrors
-        #logger.debug(u"Contribute_to_object %s: %s = %s"
-        #    % (self, predicate.encode('utf8'), attr))
-        
-        # TODO: introduce rdflib.Literal dict or force_unicode when
-        # reconverting from __dict__?
         assert str(predicate) in self.__dict__
-
-    def _tripleserialize_iterator(self,
-                                  namespace_dict):
-
-        def do_yield(resource, property, v):
-            if isinstance(v, resource.__class__):
-                # If object is referenced in attribute, "de-reference"
-                return ((resource._uri, property, v._uri))
-            else:
-
-                if not hasattr(v, "n3"):
-                    # print only newly added values without the correct
-                    # type are handled here
-
-                    if (hasattr(v, "startswith") # float has no attribute startswith
-                        and v.startswith("http://") # TODO: this is not very accurate!
-                        ):
-                        v = rdflib.URIRef(v)
-                    else:
-                        v = rdflib.Literal(v)
-
-                return ((self._uri, property, v))
-
-        for property, values in self.__dict__.items():
-
-            # skip internals
-            if str(property).startswith("_") or property == "pk":
-                continue
-
-            if property.startswith("http://"):
-                property = rdflib.URIRef(property)
-            else:
-                property = pyattr2predicate(property, namespace_dict)
-
-            assert isinstance(property, rdflib.URIRef), \
-                "property %s is not a URIRef object" % property
-
-            if isinstance(values, set):
-                for v in values:
-                    yield do_yield(self, property, v)
-            else:
-                v = values
-                yield do_yield(self, property, v)
 
     def __setattr__(self, key, value):
         if key == "_has_changes":
@@ -424,6 +378,7 @@ class OriginManager(Manager):
                 for origin in crawl:
                     origin.GET(raise_errors=False, **kwargs)
 
+
 class Origin(Model):
 
     uri = URIRefField()
@@ -462,7 +417,7 @@ class Origin(Model):
         if not self.uri:
             raise Exception("Please provide URI first")
 
-        if skip_urls is not None and str(self.uri) in skip_urls:
+        if skip_urls is not None and self.uri.encode("utf8") in skip_urls:
             self.add_error("Skipped")
             self.processed = True
             return
@@ -588,15 +543,11 @@ class Origin(Model):
 
         self._graph = graph
 
-        start_time = datetime.datetime.now()
-
         graph_handler = GraphHandler(
             only_follow_uris=only_follow_uris,
             handle_owl_imports=handle_owl_imports,
             origin=self)
         graph_handler.populate_resources(graph=graph)
-
-        self.stats['graph_processing_time'] = datetime.datetime.now() - start_time
 
         self.handled = True
 
@@ -631,13 +582,56 @@ class Origin(Model):
             for k, v in safe_dict(namespace_dict).items() \
                 if not k in safe_dict(new_ns).keys()]
 
+
+        def do_yield_triple(resource, property, v):
+            if isinstance(v, resource.__class__):
+                # If object is referenced in attribute, "de-reference"
+                return ((resource._uri, property, v._uri))
+            else:
+
+                if not hasattr(v, "n3"):
+                    # print only newly added values without the correct
+                    # type are handled here
+
+                    # TODO: this is not very accurate!
+                    # float has no attribute startswith
+                    if (hasattr(v, "startswith")
+                        and v.startswith("http://")
+                        ):
+                        v = rdflib.URIRef(v)
+                    else:
+                        v = rdflib.Literal(v)
+
+                return ((resource._uri, property, v))
+
+
         for resource in self.get_resources():
             # TODO: better idea how to do this?
             # __dict__ converts rdflib.urirefs to strings -->
             # converts back to uriref
             # {'foaf': 'http:/....', ...}
-            for triple in resource._tripleserialize_iterator(namespace_dict):
-                graph.add(triple)
+
+            for property, values in resource.__dict__.items():
+
+                # skip internals
+                if str(property).startswith("_") or property == "pk":
+                    continue
+
+                if property.startswith("http://"):
+                    property = rdflib.URIRef(property)
+                else:
+                    property = pyattr2predicate(property, namespace_dict)
+
+                assert isinstance(property, rdflib.URIRef), \
+                    "property %s is not a URIRef object" % property
+
+                if isinstance(values, set):
+                    for v in values:
+                        graph.add( do_yield_triple(resource, property, v) )
+                else:
+                    v = values
+                    graph.add( do_yield_triple(resource, property, v) )
+
         return graph
 
     def get_resources(self):

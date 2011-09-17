@@ -27,15 +27,15 @@ def pprint_resource(resource):
         logger.error("UnicodeEncodeError occurred during print")
         print c
 
-def pprint_origins_and_resources():
+def pprint_origins_and_resources(authoritative_only=False):
     res = {}
     for s in ldtools.Origin.objects.all():
         for _ in range(3): print
-        pprint.pprint(s)
-        print
+        pprint.pprint(s); print
         for r in s.get_resources():
+            if authoritative_only and not r.is_authoritative_resource():
+                continue
             pprint_resource(r)
-
 
 def get_resource_and_connected_resources(uri, depth=1, **kw):
     """Helper method to query uri and requery discovered Resouces.
@@ -43,23 +43,23 @@ def get_resource_and_connected_resources(uri, depth=1, **kw):
     r,o = cnt()
     logger.info("BEFORE %s: %s Origins and %s Resources" % (uri, r, o))
 
-    origin_uri = ldtools.hash_to_slash_uri(rdflib.URIRef(uri))
-
-    origin, origin_created = Origin.objects.get_or_create(uri=origin_uri,
-    )
+    if not ldtools.utils.is_valid_url(uri):
+        logger.error("Not a valid Uri: %s" % uri)
+        return
+    uri = ldtools.utils.get_rdflib_uriref(uri)
+    origin_uri = ldtools.utils.hash_to_slash_uri(uri)
+    origin, origin_created = Origin.objects.get_or_create(uri=origin_uri)
     origin.GET(**kw)
 
     r,o = cnt()
     logger.info("AFTER lookup %s: %s Origins and %s Resources" % (uri, r, o))
 
     res, res_created = ldtools.Resource.objects.get_or_create(uri=uri,
-        origin=origin
-    )
+        origin=origin)
 
     if depth:
         Origin.objects.GET_all(depth=depth, **kw)
 
         r,o = cnt()
         logger.info("AFTER GET_all: %s Origins and %s Resources" % (r, o))
-
     return res
