@@ -391,7 +391,6 @@ class Origin(Model):
 
     def __init__(self, pk=None, **kwargs):
         super(Origin, self).__init__(pk=pk, **kwargs)
-        self.stats = {}
         self.processed = False
 
     def __unicode__(self):
@@ -434,14 +433,14 @@ class Origin(Model):
 
         now = datetime.datetime.now()
         #self.timedelta = datetime.timedelta(minutes=1)
-        if hasattr(self, "timedelta") and 'last_processed' in self.stats:
-            time_since_last_processed = now - self.stats['last_processed']
+        if hasattr(self, "timedelta") and hasattr(self, 'last_processed'):
+            time_since_last_processed = now - self.last_processed
             if (time_since_last_processed < self.timedelta):
                 logger.info("Not processing %s again because was processed "
                 "only %s ago" % (self.uri, time_since_last_processed))
                 return
 
-        self.stats['last_processed'] = now
+        self.last_processed = now
 
         try:
             data = self.backend.GET(self.uri,
