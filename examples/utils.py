@@ -9,9 +9,12 @@ from rdflib import compare
 
 import ldtools
 from ldtools import Resource, Origin
-Origin.objects.reset_store(); Resource.objects.reset_store()
-import ipdb #; ipdb.set_trace() # overwrites sys.excepthook
+
+Origin.objects.reset_store()
+Resource.objects.reset_store()
+
 logger = ldtools.utils.set_logger(2)
+
 cnt = lambda: (len(Origin.objects.all()), len(Resource.objects.all()))
 
 def pprint_resource(resource):
