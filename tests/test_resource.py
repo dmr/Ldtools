@@ -47,14 +47,13 @@ class ResourceManagerGetFilter(unittest2.TestCase):
         self.origin.GET()
 
     def test_manager_create_relative_fails(self):
-        self.assertRaises(ValueError, Resource.objects.create, "#me",
+        self.assertRaises(ldtools.utils.UriNotValid, Resource.objects.create, "#me",
                           origin=self.origin)
 
     def test_manager_create_absolute(self):
-        uri = ldtools.utils.build_absolute_url(url=self.origin.uri,
-                                               fragment="#me")
-        resource = Resource.objects.create(uri, origin=self.origin)
-        assert str(resource._uri) == self.origin.uri + "#me"
+        url = self.origin.uri + "#me"
+        resource = Resource.objects.create(url, origin=self.origin)
+        assert resource._uri == rdflib.URIRef(url)
         assert len(Resource.objects.all()) == 1
 
     def test_manager_get(self):
@@ -141,7 +140,6 @@ _:max foaf:name "Max".""", format="n3"))
         der_max = list(resources)[0]
 
         self.assert_(der_max.is_authoritative_resource())
-
 
 
 class ResourceSave(unittest2.TestCase):

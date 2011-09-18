@@ -119,14 +119,6 @@ class ResourceManager(Manager):
         assert origin.processed, ("Origin has to be processed "
             "before creating more Resource objects: origin.GET()")
 
-
-        if isinstance(uri, (rdflib.BNode, rdflib.URIRef)):
-            pass
-        elif not utils.is_valid_url(uri):
-            msg = "URI %s not a valid URL" % uri
-            logger.error(msg)
-            raise ValueError(msg)
-
         uri = utils.get_rdflib_uriref(uri)
 
         pk = self.get_pk(origin_uri=origin.uri, uri=uri)
@@ -137,12 +129,8 @@ class ResourceManager(Manager):
                                    create_nonexistent_origin=True):
         """Tries to return the Resource object from the authoritative origin"""
 
-        if not utils.is_valid_url(uri):
-            logger.error("Not a valid Uri: %s" % uri)
-            return
         uri = utils.get_rdflib_uriref(uri)
-
-        origin_uri = utils.hash_to_slash_uri(uri)
+        origin_uri = utils.get_slash_url(uri)
 
         authoritative_origin = Origin.objects.filter(uri=origin_uri)
         authoritative_origin_list = list(authoritative_origin)
@@ -229,7 +217,7 @@ class Resource(Model):
         if isinstance(self._uri, rdflib.BNode):
             return True
 
-        if utils.hash_to_slash_uri(self._uri) == self._origin.uri:
+        if utils.get_slash_url(self._uri) == self._origin.uri:
             return True
 
     def _add_property(self, predicate, object,
@@ -330,9 +318,13 @@ class OriginManager(Manager):
         return origin
 
     def create(self, uri, BACKEND=None):
-        uri = utils.get_rdflib_uriref(uri)
 
-        assert not '#' in uri, ("HashURI not allowed as Origin: %s" % uri)
+        uri = utils.get_rdflib_uriref(uri)
+        if not uri == utils.get_slash_url(uri):
+            msg = ("URI passed to Origin Manager was not a slash URI: %s. "
+                   "Fixed now." % uri)
+            logger.debug(msg)
+            uri = utils.get_slash_url(uri)
 
         backend = BACKEND if BACKEND else RestBackend()
         origin = super(OriginManager, self).create(pk=uri, uri=uri,
@@ -352,11 +344,11 @@ class OriginManager(Manager):
 
         uri = utils.get_rdflib_uriref(uri)
         if not uri == utils.hash_to_slash_uri(uri):
-            msg = "URI is not a slash URI: %s" % uri
-            if fail_silently:
-                logger.error(msg)
-                return None, None
-            else: raise Exception(msg)
+        if not uri == utils.get_slash_url(uri):
+            msg = ("URI passed to Origin Manager was not a slash URI: %s. "
+                   "Fixed now." % uri)
+            logger.warning(msg)
+            uri = utils.get_slash_url(uri)
 
         try:
             if kwargs:
@@ -716,8 +708,7 @@ class GraphHandler(object):
                 if (predicate == rdflib.OWL.imports
                     and type(obj_ect) == rdflib.URIRef):
 
-                    uri = utils.hash_to_slash_uri(obj_ect)
-
+                    uri = utils.get_slash_url(obj_ect)
                     origin, created = Origin.objects.get_or_create(uri=uri)
 
                     logger.info("Interrupting to process owl:imports %s"
@@ -729,8 +720,9 @@ class GraphHandler(object):
                 or self.only_follow_uris is None):
 
                 if type(obj_ect) == rdflib.URIRef:
+                    # wrong scheme mailto, tel, callto --> should be Literal?
                     if utils.is_valid_url(obj_ect):
-                        obj_uriref = utils.hash_to_slash_uri(obj_ect)
+                        obj_uriref = utils.get_slash_url(obj_ect)
                         Origin.objects.get_or_create(uri=obj_uriref)
 
             resource, _created = Resource.objects.get_or_create(uri=subject,

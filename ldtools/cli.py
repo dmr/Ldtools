@@ -7,7 +7,7 @@ import datetime
 import logging
 import sys
 
-from ldtools.utils import set_logger, is_valid_url, hash_to_slash_uri
+from ldtools.utils import set_logger, is_valid_url, get_slash_url
 from ldtools.backends import __version__
 from ldtools import Origin, Resource
 
@@ -104,9 +104,9 @@ def main():
         kw["GRAPH_SIZE_LIMIT"] = results.GRAPH_SIZE_LIMIT
 
     for url in results.url:
-        url = hash_to_slash_uri(rdflib.URIRef(url))
-        logger.info("Retrieving content of %s" % url)
+        url = get_slash_url(url)
         origin, created = Origin.objects.get_or_create(url)
+        logger.info("Retrieving content of %s" % origin.uri)
 
         if results.only_negotiate:
             try:

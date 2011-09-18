@@ -9,9 +9,6 @@ def my_graph_diff(graph1, graph2):
     """Compares graph2 to graph1 and highlights everything that changed.
     Colored if pygments available"""
 
-    logger = logging.getLogger("ldtools")
-    import difflib
-
     # quick fix for wrong type
     if not type(graph1) == type(graph2) == rdflib.Graph:
         if type(graph1) == rdflib.ConjunctiveGraph:
@@ -33,8 +30,6 @@ def my_graph_diff(graph1, graph2):
     else:
         str_bit = (u"Graphs '%s' and '%s'"
                    % (graph1.identifier, graph2.identifier))
-
-        # TODO remove later
         assert not are_isomorphic(graph1, graph2)
 
     if iso1 == iso2:
@@ -51,6 +46,7 @@ def my_graph_diff(graph1, graph2):
     sorted_first = dump_nt_sorted(in_first)
     sorted_second = dump_nt_sorted(in_second)
 
+    import difflib
     diff = difflib.unified_diff(
         sorted_first,
         sorted_second,
@@ -121,11 +117,17 @@ def set_logger(verbosity_level):
 
 
 def is_valid_url(uri):
+    if not uri:
+        raise UriNotValid("An empty url is not valid")
+
     parsed = urlparse.urlparse(uri)
 
     if not parsed.scheme in ["http", "https"]:
-        logging.error("wrong scheme %s" % parsed.scheme)
+        logging.error("Not a URL. scheme is wrong: %s" % parsed.scheme)
         return False
+
+    # TODO: implement canonalization of URI. Problem: graph comparison not
+    # trivial
 
     uri = urlparse.urlunparse((parsed.scheme, parsed.netloc, parsed.path,
                          parsed.params, parsed.query,""))
@@ -142,62 +144,40 @@ class UriNotValid(Exception):
 
 def get_rdflib_uriref(uri):
     """Returns Uri that is valid and canonalized or raises Exception"""
-    if not uri:
-        raise UriNotValid("uri is None")
 
-    # TODO: implement canonalization: cut port 80, lowercase domain,
-    # http and https is equal. Problem: graph comparison
-
-    # Workaround for rdflib's handling of BNodes
     if isinstance(uri, rdflib.BNode):
         return uri
 
-    if isinstance(uri, rdflib.Literal):
+    elif isinstance(uri, rdflib.Literal):
         raise UriNotValid("Cannot convert Literals")
 
-    if isinstance(uri, rdflib.URIRef):
+    elif isinstance(uri, rdflib.URIRef):
         uriref = uri
+
     else:
         if logger:
             logger.debug(u"Converting %s to URIRef" % uri)
         uriref = rdflib.URIRef(uri)
 
-    # check if uri is valid
-    # TODO: maybe not constrain here but at export?
-    # TODO: move to "is_valid_uri" and delete here
+    # check for rdflib encoding bug
     if not uriref.encode('utf8'):
         raise UriNotValid("Not valid: %s" % uriref)
+
+    # check for parser errors
     if uriref.startswith('#'):
         raise UriNotValid("%s starts with '#'. Check your Parser" % uriref)
 
     return uriref
 
 
-def hash_to_slash_uri(uri):
+def get_slash_url(uri):
     """Converts Hash to Slash uri http://www.w3.org/wiki/HashURI"""
-    assert isinstance(uri, rdflib.URIRef)
+
+    assert is_valid_url(uri)
+    if not isinstance(uri, rdflib.URIRef):
+        uri = get_rdflib_uriref(uri)
 
     parsed = urlparse.urlparse(uri)
-
-    assert parsed.scheme in ["http", "https"], parsed.scheme
-
     uri = urlparse.urlunparse((parsed.scheme, parsed.netloc, parsed.path,
                          parsed.params, parsed.query,""))
-    assert is_valid_url(uri)
     return rdflib.URIRef(uri)
-
-
-def build_absolute_url(url, fragment):
-    assert fragment.startswith("#"), fragment
-    assert isinstance(url, rdflib.URIRef)
-
-    parsed = urlparse.urlparse(url)
-    print parsed
-    if parsed.fragment:
-        raise ValueError("Cannot add fragment to HashURI: %s + %s?"
-                         % (url, fragment))
-    url = urlparse.urlunparse((parsed.scheme, parsed.netloc,
-        parsed.path if parsed.path else "/",
-        parsed.params, parsed.query, fragment.strip("#")))
-    assert is_valid_url(url)
-    return rdflib.URIRef(url)

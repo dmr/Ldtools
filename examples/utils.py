@@ -46,16 +46,12 @@ def get_resource_and_connected_resources(uri, depth=1, **kw):
     r,o = cnt()
     logger.info("BEFORE %s: %s Origins and %s Resources" % (uri, r, o))
 
-    if not ldtools.utils.is_valid_url(uri):
-        logger.error("Not a valid Uri: %s" % uri)
-        return
-    uri = ldtools.utils.get_rdflib_uriref(uri)
-    origin_uri = ldtools.utils.hash_to_slash_uri(uri)
+    origin_uri = ldtools.utils.get_slash_url(uri)
     origin, origin_created = Origin.objects.get_or_create(uri=origin_uri)
     origin.GET(**kw)
 
     r,o = cnt()
-    logger.info("AFTER lookup %s: %s Origins and %s Resources" % (uri, r, o))
+    logger.info("AFTER lookup %s: %s Origins and %s Resources" % (origin_uri, r, o))
 
     res, res_created = ldtools.Resource.objects.get_or_create(uri=uri,
         origin=origin)
