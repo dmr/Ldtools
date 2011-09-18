@@ -73,7 +73,7 @@ class RestBackend(AbstractBackend):
     def GET(self,
             uri,
             extra_headers=None,
-            backend_httphandler=None,
+            httphandler=None,
         ):
         """Lookup URI and follow redirects. Return data"""
 
@@ -84,11 +84,11 @@ class RestBackend(AbstractBackend):
                 raise Exception("You cannot pass different uris to the same "
                                 "backend")
 
-        if backend_httphandler:
-            if isinstance(backend_httphandler, list):
-                opener = urllib2.build_opener(*backend_httphandler)
+        if httphandler:
+            if isinstance(httphandler, list):
+                opener = urllib2.build_opener(*httphandler)
             else:
-                opener = urllib2.build_opener(backend_httphandler)
+                opener = urllib2.build_opener(httphandler)
         else:
             opener = urllib2.build_opener()
 
@@ -177,10 +177,10 @@ class FileBackend(AbstractBackend):
     def GET(self,
             uri,
             extra_headers=None,
-            backend_httphandler=None,
+            httphandler=None,
             ):
         assert not extra_headers, "Not Implemented"
-        assert not backend_httphandler, "Not Implemented"
+        assert not httphandler, "Not Implemented"
         if not hasattr(self, "uri"):
             self.uri = uri
         else:
@@ -229,10 +229,10 @@ class MemoryBackend(AbstractBackend):
     def GET(self,
             uri,
             extra_headers=None,
-            backend_httphandler=None,
+            httphandler=None,
             ):
         assert not extra_headers, "Not Implemented"
-        assert not backend_httphandler, "Not Implemented"
+        assert not httphandler, "Not Implemented"
         return self.data
 
     def PUT(self, data):

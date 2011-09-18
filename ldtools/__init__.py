@@ -399,10 +399,9 @@ class Origin(Model):
             GRAPH_SIZE_LIMIT=30000,
             only_follow_uris=None,
             handle_owl_imports=False,
-            skip_urls=None,
             raise_errors=True,
-
-            backend_httphandler=None,
+            skip_urls=None,
+            httphandler=None,
             ):
 
         if not self.uri:
@@ -436,7 +435,7 @@ class Origin(Model):
 
         try:
             data = self.backend.GET(self.uri,
-                                    backend_httphandler=backend_httphandler)
+                                    httphandler=httphandler)
         except urllib2.HTTPError as e:
             if e.code in [
                     401,

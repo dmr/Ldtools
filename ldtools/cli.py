@@ -112,7 +112,7 @@ def main():
             try:
                 import urllib2
                 data = origin.backend.GET(uri=origin.uri,
-                    backend_httphandler=urllib2.HTTPHandler(debuglevel=1))
+                    httphandler=urllib2.HTTPHandler(debuglevel=1))
             except Exception as e:
                 print e.message
 
@@ -120,7 +120,7 @@ def main():
             try:
                 import urllib2
                 data = origin.backend.GET(uri=origin.uri,
-                    backend_httphandler=urllib2.HTTPHandler(debuglevel=1))
+                    httphandler=urllib2.HTTPHandler(debuglevel=1))
                 print
                 print data
                 print
