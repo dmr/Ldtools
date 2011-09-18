@@ -72,7 +72,7 @@ def pyattr2predicate(pyattr, namespace_dict):
 
     splitlist = pyattr.split("_")
 
-    # TODO: check for namespace prefix limitations
+    # this code ckecks pyattr for namespace prefix limitations
     splitlistlen = len(splitlist)
     if splitlistlen == 1:
         # attribute "homepage" --> check if "" in namespace_dict
@@ -143,7 +143,6 @@ class ResourceManager(Manager):
                 raise self.model.DoesNotExist("No authoritative "
                 "Resource found for %s" %uri)
 
-        # TODO: make this configurable
         if not origin.has_unsaved_changes():
             origin.GET(only_follow_uris=[], raise_errors=False)
 
@@ -186,7 +185,6 @@ class ResourceManager(Manager):
         assert 0, "implement!"
 
     def get_or_create(self, uri, origin=None):
-
         uri = utils.get_rdflib_uriref(uri)
         try:
             return self.get(uri=uri, origin=origin), False
@@ -271,7 +269,6 @@ class Resource(Model):
         else:
             setattr(self, predicate, object)
             attr = getattr(self, predicate)
-            assert attr == object
 
         assert str(predicate) in self.__dict__
 
@@ -286,7 +283,8 @@ class Resource(Model):
                 value = field.to_python(value)
         elif not key.startswith("_") and not key == "pk":
             # Assumption: rdf attributes do not start with "_"
-            pass # TODO: validate
+            pass
+
         Model.__setattr__(self, key, value)
         self._has_changes = True
 
@@ -295,13 +293,12 @@ class Resource(Model):
             self.__class__.objects._storage.__delitem__(self.pk)
 
     def save(self):
-        # TODO Move to models.py and introduce "clean" to validate properties
         created = not self.pk
         if created:
             assert 0, ("Please use Resource.objects.create() to create "
                        "Resource objects!")
         assert self in Resource.objects.filter(_origin=self._origin)
-        #values = dict((name, getattr(self, name)) for name in
+        #defined_values = dict((name, getattr(self, name)) for name in
         # self._meta.fields.iterkeys())
         self.update() #**values)
 
@@ -333,17 +330,13 @@ class OriginManager(Manager):
 
     def get(self, uri, **kwargs):
         """Retrieves Origin object from Store"""
-
         uri = utils.get_rdflib_uriref(uri)
-
         return super(OriginManager, self).get(pk=uri)
 
-    def get_or_create(self, uri, fail_silently=True,
-                      **kwargs #TODO: remove kwargs for better api
-                      ):
+    def get_or_create(self, uri,
+                      **kwargs):
 
         uri = utils.get_rdflib_uriref(uri)
-        if not uri == utils.hash_to_slash_uri(uri):
         if not uri == utils.get_slash_url(uri):
             msg = ("URI passed to Origin Manager was not a slash URI: %s. "
                    "Fixed now." % uri)
@@ -351,8 +344,7 @@ class OriginManager(Manager):
             uri = utils.get_slash_url(uri)
 
         try:
-            if kwargs:
-                logger.warning("kwargs are ignored for get.")
+            if kwargs: logger.warning("kwargs are ignored for get.")
             return self.get(uri), False
         except self.model.DoesNotExist:
             return self.create(uri, **kwargs), True
@@ -360,9 +352,6 @@ class OriginManager(Manager):
     @catchKeyboardInterrupt
     def GET_all(self, depth=2, **kwargs):
         """Crawls or Re-Crawls all Origins. Passes Arguments to GET"""
-
-        # TODO: limit crawling speed
-
         func = lambda origin: True if not origin.processed else False
         for _i in range(depth):
             crawl = filter(func, self.all())
@@ -485,7 +474,6 @@ class Origin(Model):
             if raise_errors: raise e
             else: return
         except IOError as e:
-            # TODO: why does this occur? guess: wrong protocol
             self.add_error("IOError")
             logger.error("IOError: %s" % self)
             if raise_errors: raise e
@@ -543,7 +531,8 @@ class Origin(Model):
 
     def get_graph(self):
         """Processes every Resource and Property related to 'self'"""
-        #rdflib.ConjunctiveGraph because rdflib.Graph does not allow parsing plugins
+        #rdflib.ConjunctiveGraph because rdflib.Graph does not allow
+        # usage of parsing plugins
         graph = rdflib.graph.ConjunctiveGraph(identifier=self.uri)
 
         if not hasattr(self, '_graph'):
@@ -552,12 +541,10 @@ class Origin(Model):
                               ".get_graph()"
                     % self.uri)
                 return graph
+            assert hasattr(self, "_graph"), ("graph has to be "
+                "processed before executing get_graph()")
 
-            #self.GET(raise_errors=False) # TODO: test for recursion?
-
-
-        # TODO: find a better way to do this
-        # Problems:
+        # Problems with namespacemapping here:
         #  1) namespace bindings are not really necessary to validate
         #     isomorphic graphs but the resulting graph is is different
         #     if they miss
@@ -583,7 +570,6 @@ class Origin(Model):
                     # print only newly added values without the correct
                     # type are handled here
 
-                    # TODO: this is not very accurate!
                     # float has no attribute startswith
                     if (hasattr(v, "startswith")
                         and v.startswith("http://")
@@ -596,9 +582,8 @@ class Origin(Model):
 
 
         for resource in self.get_resources():
-            # TODO: better idea how to do this?
-            # __dict__ converts rdflib.urirefs to strings -->
-            # converts back to uriref
+            # __dict__ converts rdflib.urirefs to strings for keys -->
+            # convert back the dict's items back to uriref
             # {'foaf': 'http:/....', ...}
 
             for property, values in resource.__dict__.items():
@@ -649,14 +634,12 @@ class Origin(Model):
         graph = self.get_graph()
         data = graph.serialize(format=self.backend.format)
 
-        # TODO: synchronize if remote resource is still up to date?
         self.backend.PUT(data=data)
 
         for resource in Resource.objects.filter(_has_changes=True):
             resource._has_changes = False
 
         assert not self.has_unsaved_changes(), "something went wrong"
-        # TODO return "OK"
 
 
 def check_shortcut_consistency():
@@ -690,15 +673,6 @@ class GraphHandler(object):
 
         for subject, predicate, obj_ect in graph:
             assert hasattr(subject, "n3")
-
-            #subject = utils.get_rdflib_uriref(subject)
-
-            #if isinstance(subject, rdflib.BNode):
-            #    assert 0, "subject is BNode: %s %s %s" % (subject, predicate, obj_ect)
-            #if isinstance(predicate, rdflib.BNode):
-            #    assert 0, "predicate is BNode: %s %s %s" % (subject, predicate, obj_ect)
-            #if isinstance(obj_ect, rdflib.BNode):
-            #    assert 0, "object is BNode: %s %s %s" % (subject, predicate, obj_ect)
 
             # workaround for rdflib's unicode problems
             assert predicate.encode('utf8')
