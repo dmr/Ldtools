@@ -165,7 +165,9 @@ class RestBackend(AbstractBackend):
 class FileBackend(AbstractBackend):
     """Manages one xml file as a data basis"""
 
-    def __init__(self, filename, format=None):
+    def __init__(self, filename,
+                 format=None,
+                 store_old_versions=True):
         assert os.path.exists(filename)
 
         format = format if format else guess_format_from_filename(filename)
@@ -173,6 +175,7 @@ class FileBackend(AbstractBackend):
 
         self.format = format
         self.filename = filename
+        self.store_old_versions = store_old_versions
 
     def GET(self,
             uri,
@@ -193,9 +196,9 @@ class FileBackend(AbstractBackend):
         return data
 
     def PUT(self, data):
-        assert self.uri, "GET has to be called before PUT possible"
+        assert self.uri, "GET has to be called before PUT"
 
-        if os.path.exists(self.filename):
+        if os.path.exists(self.filename) and self.store_old_versions:
             # File already exists. Make backup copy
             now = datetime.datetime.strftime(datetime.datetime.utcnow(),
                                              '%Y%m%d-%H%M%S')
@@ -206,13 +209,15 @@ class FileBackend(AbstractBackend):
                     now, file_extension)
             else:
                 old_version = u"%s_%s" % (self.filename, now)
+            self.old_version = old_version
             shutil.copy(self.filename, old_version)
 
         with open(self.filename, "w") as f:
             f.write(data)
-        self.old_version = old_version
 
     def revert_to_old_version(self):
+        assert self.store_old_versions, ("This FileBackend is not configured "
+            "to store old versions")
         if hasattr(self, "old_version"):
             logger.info("Reverting to version before last saved version")
             shutil.copy(self.old_version, self.filename)
