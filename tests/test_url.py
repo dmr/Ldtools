@@ -1,6 +1,6 @@
 import unittest2
 from ldtools.utils import is_valid_url, get_rdflib_uriref, UriNotValid, \
-    hash_to_slash_uri
+    get_slash_url
 import rdflib
 import urlparse
 
@@ -11,17 +11,21 @@ import urlparse
 class IsValidUrlTestCase(unittest2.TestCase):
     def test_is_valid_url(self):
         test_cases = [
-            ("htp://a.com", False),
             ("http://a.com", True),
+        ]
+        for url, is_valid in test_cases:
+            self.assertEqual(is_valid_url(url), is_valid, msg=url)
+
+    def test_is_not_valid_url(self):
+        test_cases = [
+            ("htp://a.com", False),
             ("ttp://www.ifrade.es/#frade", False),
         ]
         for url, is_valid in test_cases:
             self.assertEqual(is_valid_url(url), is_valid, msg=url)
 
-class HashToSlashUriTestCase(unittest2.TestCase):
-    def test_expects_uriref(self):
-        self.assertRaises(AssertionError, hash_to_slash_uri, "http://a.com")
 
+class HashToSlashUriTestCase(unittest2.TestCase):
     def test_hash_or_slash_uri_result(self):
         test_cases = [
             ("http://creativecommons.org/licenses/by-nc/3.0/",
@@ -33,10 +37,10 @@ class HashToSlashUriTestCase(unittest2.TestCase):
 
             print urlparse.urlparse(test)
 
-            test = rdflib.URIRef(test)
+            test = test
             result = rdflib.URIRef(result)
 
-            self.assertEqual(hash_to_slash_uri(test), result, msg=test)
+            self.assertEqual(get_slash_url(test), result, msg=test)
 
     def test_hash_or_slash_uri_exceptions(self):
         test_cases = [
@@ -48,7 +52,7 @@ class HashToSlashUriTestCase(unittest2.TestCase):
             test = rdflib.URIRef(test)
             result = rdflib.URIRef(result)
 
-            self.assertEqual(hash_to_slash_uri(test), result, msg=test)
+            self.assertEqual(get_slash_url(test), result, msg=test)
 
 class GetRdflibUrirefTestCase(unittest2.TestCase):
     def test_get_rdflib_uriref_exceptions(self):
