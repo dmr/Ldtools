@@ -67,7 +67,7 @@ class GraphHandlerScenario1TestCase(Scenario1TestMixin, GraphHandlerTestCase,
                        rdflib.term.URIRef('http://xmlns.com/foaf/0.1/Person')),
             graph.triples((None, None, None))
         )
-        self.assert_(not ldtools.utils.my_graph_diff(graph,
+        self.assert_(not ldtools.helpers.my_graph_diff(graph,
                                                  self.origin.get_graph()))
 
 
@@ -91,7 +91,7 @@ class GraphHandlerScenario2TestCase(Scenario2TestMixin, GraphHandlerTestCase,
     def assure_results(self, graph):
         self.assertEqual(cnt(), (3, 3))
         self.assertEqual(len(graph), 2)
-        self.assert_(not ldtools.utils.my_graph_diff(graph,
+        self.assert_(not ldtools.helpers.my_graph_diff(graph,
                                                  self.origin.get_graph()))
 
 
@@ -105,7 +105,7 @@ class GraphHandlerScenario2TestCaseOnlyFollowUrisMiss(Scenario2TestMixin, GraphH
         self.assertEqual(cnt(), (1, 3))
 
         self.assertEqual(len(graph), 2)
-        self.assert_(not ldtools.utils.my_graph_diff(graph,
+        self.assert_(not ldtools.helpers.my_graph_diff(graph,
                                                  self.origin.get_graph()))
 
 
@@ -119,7 +119,7 @@ class GraphHandlerScenario2TestCaseOnlyFollowUrisHit(Scenario2TestMixin, GraphHa
         self.assertEqual(cnt(), (2, 3))
 
         self.assertEqual(len(graph), 2)
-        self.assert_(not ldtools.utils.my_graph_diff(graph,
+        self.assert_(not ldtools.helpers.my_graph_diff(graph,
                                                  self.origin.get_graph()))
 
 
@@ -163,7 +163,7 @@ class GraphHandlerScenario3TestCase(Scenario3TestMixin, GraphHandlerTestCase,
         self.assertEqual(cnt(), (4, 5))
         self.assertEqual(len(graph), 5)
         # assert graph == get_graph()
-        self.assert_(not ldtools.utils.my_graph_diff(graph,
+        self.assert_(not ldtools.helpers.my_graph_diff(graph,
                                                  self.origin.get_graph()))
         self.assert_(not self.origin2.processed)
 
@@ -175,6 +175,6 @@ class GraphHandlerScenario3TestCaseOwlImports(Scenario3TestMixin, GraphHandlerTe
         self.assertEqual(cnt(), (5, 8))
         self.assertEqual(len(graph), 5)
         # assert graph == get_graph()
-        self.assert_(not ldtools.utils.my_graph_diff(graph,
+        self.assert_(not ldtools.helpers.my_graph_diff(graph,
                                                  self.origin.get_graph()))
         self.assert_(self.origin2.processed)

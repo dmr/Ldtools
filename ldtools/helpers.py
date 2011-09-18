@@ -90,6 +90,8 @@ def my_graph_diff(graph1, graph2):
     sorted_first = dump_nt_sorted(in_first)
     sorted_second = dump_nt_sorted(in_second)
 
+    import difflib
+
     diff = difflib.unified_diff(
         sorted_first,
         sorted_second,
