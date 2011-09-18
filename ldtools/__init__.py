@@ -12,6 +12,7 @@ from xml.sax._exceptions import SAXParseException
 from rdflib.namespace import split_uri
 from rdflib import compare
 
+import helpers
 import utils
 
 # set socket timeout. URLError will occur if time passed
@@ -507,10 +508,7 @@ class Origin(Model):
                 return
             else:
                 logging.warning("GET retrieved updates for %s!" % self.uri)
-                try:
-                    utils.my_graph_diff(self._graph, graph)
-                except ImportError:
-                    pass
+                helpers.my_graph_diff(self._graph, graph)
 
                 for resource in self.get_resources():
                     resource.delete()

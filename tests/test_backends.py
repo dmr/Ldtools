@@ -91,8 +91,10 @@ class RestBackendTestCase(unittest2.TestCase):
 
     def test_GET_n3(self):
         uri = "http://dbpedia.org/resource/Karlsruhe"
+
         data = self.BACKEND.GET(uri, extra_headers={'Accept':('text/n3,')})
         self.assertEqual(self.BACKEND.format, "n3")
+
         self.assert_(data.startswith("@prefix"))
 
     def test_GET_xml(self):
@@ -102,8 +104,7 @@ class RestBackendTestCase(unittest2.TestCase):
         data = self.BACKEND.GET(uri,
             # will replace Accept headers
             extra_headers={'Accept':('application/rdf+xml')})
-
         self.assertEqual(self.BACKEND.format, "xml")
-        print data
+
         self.assert_(data.startswith("<?xml "))
         self.assert_("<rdf" in data)

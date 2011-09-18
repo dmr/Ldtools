@@ -7,7 +7,8 @@ import datetime
 import logging
 import sys
 
-from ldtools.utils import set_logger, is_valid_url, get_slash_url
+from ldtools.utils import is_valid_url, get_slash_url
+from ldtools.helpers import set_colored_logger
 from ldtools.backends import __version__
 from ldtools import Origin, Resource
 
@@ -70,7 +71,7 @@ def main():
     parser = get_parser()
     results = parser.parse_args()
 
-    set_logger(results.verbosity)
+    set_colored_logger(results.verbosity)
 
     # customize Origin.objects.post_create_hook for performance reasons
     def custom_post_create_hook(origin):
