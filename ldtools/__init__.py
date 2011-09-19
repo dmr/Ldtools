@@ -488,7 +488,13 @@ class Origin(Model):
         g_length = len(graph)
 
         if g_length > 0:
-            assert len(list(graph.contexts())) == 1
+            if len(list(graph.contexts())) > 1:
+                # detect problems with graph contexts: rdflib can only
+                # compare graphs with one context. If a graph has more
+                # contexts this might result in wrong comparisons of graphs
+                # Still ignored here as ldtools is more robust by doing so.
+                logger.error("The graph has more than one context. This"
+                    "might cause problems comparing the graphs!")
 
         if g_length > GRAPH_SIZE_LIMIT:
             logger.error("Maximum graph size exceeded. Thr graph is %s "

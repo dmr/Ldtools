@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-__version__ = "0.5.5"
+__version__ = "0.5.6"
 __useragent__ = ('ldtools-%s (http://github.com/dmr/ldtools, daniel@nwebs.de)'
                  % __version__)
 
