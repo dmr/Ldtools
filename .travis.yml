@@ -1,0 +1,15 @@
+language: python
+python:
+ - "2.6"
+ - "2.7"
+
+install: python setup.py -q install
+script: nosetests --with-coverage --cover-package=ldtools
+
+before_install:
+ - pip install unittest2 spec
+
+notifications:
+  email:
+    recipients:
+      - dr@nwebs.de

@@ -1,23 +1,29 @@
 # -*- coding: utf-8 -*-
-__version__ = "0.5.6"
+from ldtools.backends import __version__, url, author_email
 
 import os
-from setuptools import setup, find_packages
+from setuptools import setup #, find_packages
 
 README = open(os.path.join(os.path.dirname(__file__), "README.rst")).read()
 
 setup(
     name='Ldtools',
     version=__version__,
-    url='http://github.com/dmr/ldtools/',
+    url=url,
     license='BSD',
     author='Daniel Rech',
-    author_email='daniel@nwebs.de',
-    description='A lightweight orm for Linked Data',
+    author_email=author_email,
+    description='A lightweight ORM for Linked Data',
     long_description=README,
-    packages=find_packages(),
 
-    scripts=['scripts/ldtools'],
+    packages=["ldtools"],
+    #packages=find_packages(),
+
+    entry_points={
+        'console_scripts': [
+            'ldtools = ldtools.cli:main'
+        ]
+    },
 
     install_requires=[
         "rdflib",
@@ -25,7 +31,11 @@ setup(
     ],
 
     extras_require={
-        'tests': ["nose", "unittest2",],
+        'test': [
+            "unittest2",
+            "spec",
+            "nose>=1.1,<1.2",
+        ],
     },
     test_suite='nose.collector',
 
