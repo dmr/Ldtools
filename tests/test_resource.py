@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
-import os
 import unittest2
 
 import rdflib
-from rdflib import compare
 
-import ldtools
-from ldtools import Resource, Origin
+from ldtools.backends import MemoryBackend
+from ldtools.origin import Origin
+from ldtools.resource import Resource
+from ldtools.utils import UriNotValid
+from ldtools.tools import get_authoritative_resource
+
 
 DATA_XML = """
 <rdf:RDF xmlns="http://xmlns.com/foaf/0.1/"
@@ -43,12 +45,12 @@ class ResourceManagerGetFilter(unittest2.TestCase):
         Resource.objects.reset_store()
         uri = "http://example.org/resource"
         self.origin = Origin.objects.create(uri,
-                                            BACKEND=ldtools.MemoryBackend())
+                                            BACKEND=MemoryBackend())
         self.origin.GET()
 
     def test_manager_create_relative_fails(self):
-        self.assertRaises(ldtools.utils.UriNotValid, Resource.objects.create, "#me",
-                          origin=self.origin)
+        with self.assertRaises(UriNotValid):
+            Resource.objects.create("#me", origin=self.origin)
 
     def test_manager_create_absolute(self):
         url = self.origin.uri + "#me"
@@ -75,7 +77,7 @@ class ResourceManagerGetFilter(unittest2.TestCase):
 class ResourceCreate(unittest2.TestCase):
     def test_create_1(self):
         origin = Origin.objects.create(uri="http://example.org/",
-            BACKEND=ldtools.MemoryBackend())
+            BACKEND=MemoryBackend())
         origin.GET()
         resource = Resource.objects.create(origin=origin,
             uri=rdflib.BNode())
@@ -90,7 +92,7 @@ class ResourceGetAuthoritative(unittest2.TestCase):
 
     def test_is_same_uri(self):
         origin1 = Origin.objects.create(uri="http://example1.com/person1",
-            BACKEND=ldtools.MemoryBackend("""
+            BACKEND=MemoryBackend("""
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 <person1> a foaf:Person;
     foaf:knows <http://example2.com/person2>.
@@ -105,7 +107,7 @@ class ResourceGetAuthoritative(unittest2.TestCase):
         # created --> overwrite backend parameter
         origin2 = Origin.objects.get(uri="http://example2.com/person2")
         self.assert_(not origin2.processed)
-        origin2.backend = ldtools.MemoryBackend("""
+        origin2.backend = MemoryBackend("""
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 <person2> a foaf:Person;
     foaf:name "Maximilian".""", format="n3")
@@ -114,7 +116,7 @@ class ResourceGetAuthoritative(unittest2.TestCase):
 
         self.assert_(not r2.is_authoritative_resource())
 
-        r2auth = Resource.objects.get_authoritative_resource(r2._uri)
+        r2auth = get_authoritative_resource(r2._uri)
 
         self.assert_(r2auth.is_authoritative_resource())
 
@@ -124,7 +126,7 @@ class ResourceGetAuthoritative(unittest2.TestCase):
 
     def test_blank_node_is_auth(self):
         origin1 = Origin.objects.create(uri="http://example1.com/person1",
-            BACKEND=ldtools.MemoryBackend("""
+            BACKEND=MemoryBackend("""
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 <person1> foaf:knows _:max.
 _:max foaf:name "Max".""", format="n3"))
@@ -150,7 +152,7 @@ class ResourceSave(unittest2.TestCase):
 
         uri = "http://example.org/foaf"
         self.origin1 = Origin.objects.create(uri=uri,
-                             BACKEND=ldtools.MemoryBackend(DATA_XML,))
+                             BACKEND=MemoryBackend(DATA_XML,))
         self.origin1.GET()
 
         res = Resource.objects.get(uri)

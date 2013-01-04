@@ -1,12 +1,9 @@
 # -*- coding: utf-8 -*-
-import os
 import unittest2
 
-import rdflib
-from rdflib import compare
-
-import ldtools
-from ldtools import Resource, Origin
+from ldtools.resource import Resource
+from ldtools.backends import MemoryBackend
+from ldtools.origin import Origin, check_shortcut_consistency
 
 
 class NamespaceShortcutConsistencyTestCase(unittest2.TestCase):
@@ -26,21 +23,22 @@ class NamespaceShortcutConsistencyTestCase(unittest2.TestCase):
 
     def _scenario_setup(self, foaf_uri1, foaf_uri2):
         data = self.sample_data % foaf_uri1
-        backend = ldtools.MemoryBackend(data=data)
+        backend = MemoryBackend(data=data)
         origin1 = Origin.objects.create("http://example.org/sample1",
                                                      BACKEND=backend)
         origin1.GET()
 
         data = self.sample_data % foaf_uri2
-        backend = ldtools.MemoryBackend(data=data)
+        backend = MemoryBackend(data=data)
         origin2 = Origin.objects.create("http://example.org/sample2",
                                                      BACKEND=backend)
         origin2.GET()
 
     def test_check_shortcut_consistency_does_not_complain(self):
         self._scenario_setup(self.foaf_uri1, self.foaf_uri1)
-        self.assert_(not ldtools.check_shortcut_consistency())
+        self.assert_(not check_shortcut_consistency())
 
     def test_check_shortcut_consistency_complains(self):
         self._scenario_setup(self.foaf_uri1, self.foaf_uri2)
-        self.assertRaises(AssertionError, ldtools.check_shortcut_consistency)
+        with self.assertRaises(AssertionError):
+            check_shortcut_consistency()

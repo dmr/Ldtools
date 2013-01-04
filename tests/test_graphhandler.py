@@ -1,10 +1,14 @@
+from ldtools.backends import MemoryBackend
+from ldtools.helpers import my_graph_diff
 import unittest2
-import ldtools
 import rdflib
-from rdflib import compare
 
-cnt = lambda: (len(ldtools.Origin.objects.all()),
-               len(ldtools.Resource.objects.all()))
+from ldtools.origin import Origin, GraphHandler
+from ldtools.resource import Resource
+
+
+cnt = lambda: (len(Origin.objects.all()),
+               len(Resource.objects.all()))
 
 
 class GraphHandlerTestCase(object):
@@ -26,7 +30,7 @@ class GraphHandlerTestCase(object):
         self.origin._graph = graph
         # mimic until here
 
-        graph_handler = ldtools.GraphHandler(origin=self.origin, **self.kw)
+        graph_handler = GraphHandler(origin=self.origin, **self.kw)
 
         graph_handler.populate_resources(graph=graph)
         self.origin.handled = True
@@ -36,18 +40,18 @@ class GraphHandlerTestCase(object):
 
 class Scenario1TestMixin(object):
     def _setUpScenario(self):
-        ldtools.Resource.objects.reset_store()
-        ldtools.Origin.objects.reset_store()
+        Resource.objects.reset_store()
+        Origin.objects.reset_store()
 
         uri = "http://example.com/foaf"
-        BACKEND = ldtools.MemoryBackend(data='''<rdf:RDF
+        BACKEND = MemoryBackend(data='''<rdf:RDF
       xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
       xmlns:foaf="http://xmlns.com/foaf/0.1/">
     <foaf:Person rdf:about="#me">
         <foaf:name>Max Mustermann</foaf:name>
     </foaf:Person></rdf:RDF>''')
 
-        self.origin = ldtools.Origin.objects.create(uri=uri, BACKEND=BACKEND)
+        self.origin = Origin.objects.create(uri=uri, BACKEND=BACKEND)
 
 
 class GraphHandlerScenario1TestCase(Scenario1TestMixin, GraphHandlerTestCase,
@@ -67,21 +71,20 @@ class GraphHandlerScenario1TestCase(Scenario1TestMixin, GraphHandlerTestCase,
                        rdflib.term.URIRef('http://xmlns.com/foaf/0.1/Person')),
             graph.triples((None, None, None))
         )
-        self.assert_(not ldtools.helpers.my_graph_diff(graph,
-                                                 self.origin.get_graph()))
+        self.assert_(not my_graph_diff(graph, self.origin.get_graph()))
 
 
 class Scenario2TestMixin(object):
     def _setUpScenario(self):
-        ldtools.Resource.objects.reset_store()
-        ldtools.Origin.objects.reset_store()
+        Resource.objects.reset_store()
+        Origin.objects.reset_store()
 
         uri = "http://example.com/foaf"
-        BACKEND = ldtools.MemoryBackend(data='''@prefix voc: <http://example.com/myvoc#> .
+        BACKEND = MemoryBackend(data='''@prefix voc: <http://example.com/myvoc#> .
 <household0> a voc:DataNetwork;
     voc:device <car1> .''', format="n3")
 
-        self.origin = ldtools.Origin.objects.create(uri=uri, BACKEND=BACKEND)
+        self.origin = Origin.objects.create(uri=uri, BACKEND=BACKEND)
 
 
 class GraphHandlerScenario2TestCase(Scenario2TestMixin, GraphHandlerTestCase,
@@ -91,8 +94,7 @@ class GraphHandlerScenario2TestCase(Scenario2TestMixin, GraphHandlerTestCase,
     def assure_results(self, graph):
         self.assertEqual(cnt(), (3, 3))
         self.assertEqual(len(graph), 2)
-        self.assert_(not ldtools.helpers.my_graph_diff(graph,
-                                                 self.origin.get_graph()))
+        self.assert_(not my_graph_diff(graph, self.origin.get_graph()))
 
 
 class GraphHandlerScenario2TestCaseOnlyFollowUrisMiss(Scenario2TestMixin, GraphHandlerTestCase,
@@ -105,8 +107,7 @@ class GraphHandlerScenario2TestCaseOnlyFollowUrisMiss(Scenario2TestMixin, GraphH
         self.assertEqual(cnt(), (1, 3))
 
         self.assertEqual(len(graph), 2)
-        self.assert_(not ldtools.helpers.my_graph_diff(graph,
-                                                 self.origin.get_graph()))
+        self.assert_(not my_graph_diff(graph, self.origin.get_graph()))
 
 
 class GraphHandlerScenario2TestCaseOnlyFollowUrisHit(Scenario2TestMixin, GraphHandlerTestCase,
@@ -119,14 +120,13 @@ class GraphHandlerScenario2TestCaseOnlyFollowUrisHit(Scenario2TestMixin, GraphHa
         self.assertEqual(cnt(), (2, 3))
 
         self.assertEqual(len(graph), 2)
-        self.assert_(not ldtools.helpers.my_graph_diff(graph,
-                                                 self.origin.get_graph()))
+        self.assert_(not my_graph_diff(graph, self.origin.get_graph()))
 
 
 class Scenario3TestMixin(object):
     def _setUpScenario(self):
-        ldtools.Resource.objects.reset_store()
-        ldtools.Origin.objects.reset_store()
+        Resource.objects.reset_store()
+        Origin.objects.reset_store()
 
         baseuri =  "http://example.com/%s"
 
@@ -134,15 +134,15 @@ class Scenario3TestMixin(object):
         # This is a trick to avoid doing requests to real uris.
         # (Usually origin.objects.get_or_create would choose RestBackend...)
         # will be processed during "handle_owl_imports=True"
-        self.origin2 = ldtools.Origin.objects.create(uri=baseuri % "friends",
-            BACKEND=ldtools.MemoryBackend(data='''@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+        self.origin2 = Origin.objects.create(uri=baseuri % "friends",
+            BACKEND=MemoryBackend(data='''@prefix foaf: <http://xmlns.com/foaf/0.1/> .
 <dieter> a foaf:Person;
     foaf:name "Dieter".
 <klaus> a foaf:Person;
     foaf:name "Klaus".''', format="n3"))
 
-        self.origin = ldtools.Origin.objects.create(
-            uri=baseuri % "foaf", BACKEND=ldtools.MemoryBackend(data='''<rdf:RDF
+        self.origin = Origin.objects.create(
+            uri=baseuri % "foaf", BACKEND=MemoryBackend(data='''<rdf:RDF
       xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
       xmlns:owl="http://www.w3.org/2002/07/owl#"
       xmlns:foaf="%s">
@@ -163,8 +163,7 @@ class GraphHandlerScenario3TestCase(Scenario3TestMixin, GraphHandlerTestCase,
         self.assertEqual(cnt(), (4, 5))
         self.assertEqual(len(graph), 5)
         # assert graph == get_graph()
-        self.assert_(not ldtools.helpers.my_graph_diff(graph,
-                                                 self.origin.get_graph()))
+        self.assert_(not my_graph_diff(graph, self.origin.get_graph()))
         self.assert_(not self.origin2.processed)
 
 class GraphHandlerScenario3TestCaseOwlImports(Scenario3TestMixin, GraphHandlerTestCase,
@@ -175,6 +174,5 @@ class GraphHandlerScenario3TestCaseOwlImports(Scenario3TestMixin, GraphHandlerTe
         self.assertEqual(cnt(), (5, 8))
         self.assertEqual(len(graph), 5)
         # assert graph == get_graph()
-        self.assert_(not ldtools.helpers.my_graph_diff(graph,
-                                                 self.origin.get_graph()))
+        self.assert_(not my_graph_diff(graph, self.origin.get_graph()))
         self.assert_(self.origin2.processed)

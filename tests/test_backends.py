@@ -2,11 +2,8 @@
 import os
 import unittest2
 
-import rdflib
-from rdflib import compare
-
-import ldtools
-from ldtools.backends import get_file_extension
+from ldtools.backends import get_file_extension, RestBackend, MemoryBackend,\
+    FileBackend
 
 
 class StandardBackendReturnsRdflibGraphTestMixin(object):
@@ -43,13 +40,12 @@ class StandardBackendReturnsRdflibGraphTestMixin(object):
     # TODO: that to check?
 
 
-
 class FileBackendTestCase(unittest2.TestCase,
                           StandardBackendReturnsRdflibGraphTestMixin):
     def setUp(self):
         filename = "www_w3_org__People__Berners-Lee__card.xml"
         file_name = os.path.join(os.path.dirname(__file__), filename)
-        self.BACKEND = ldtools.FileBackend(file_name)
+        self.BACKEND = FileBackend(file_name)
 
         # TODO implement file object handling, maybe use
         # tempfile.NamedTemporaryFile instead of file
@@ -62,7 +58,6 @@ class FileBackendTestCase(unittest2.TestCase,
         pass # TODO
 
 
-
 class MemoryBackendTestCase(unittest2.TestCase,
                           StandardBackendReturnsRdflibGraphTestMixin):
     def setUp(self):
@@ -70,7 +65,7 @@ class MemoryBackendTestCase(unittest2.TestCase,
         file_name = os.path.join(os.path.dirname(__file__), filename)
         with open(file_name, "r") as f:
             data = f.read()
-        self.BACKEND = ldtools.MemoryBackend(data)
+        self.BACKEND = MemoryBackend(data)
 
 
 class GetFileExtensionTestCase(unittest2.TestCase):
@@ -87,7 +82,7 @@ class GetFileExtensionTestCase(unittest2.TestCase):
 class RestBackendTestCase(unittest2.TestCase):
 
     def setUp(self):
-        self.BACKEND = ldtools.RestBackend()
+        self.BACKEND = RestBackend()
 
     def test_GET_n3(self):
         uri = "http://dbpedia.org/resource/Karlsruhe"

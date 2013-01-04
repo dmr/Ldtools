@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 import unittest2
 
-import rdflib
-from rdflib import compare
+from ldtools.origin import Origin
+from ldtools.resource import Resource
+from ldtools.backends import MemoryBackend
 
-import ldtools
-from ldtools import Resource, Origin
 
 class OriginIsDirtyTestCase(unittest2.TestCase):
     def setUp(self):
@@ -13,7 +12,7 @@ class OriginIsDirtyTestCase(unittest2.TestCase):
         Resource.objects.reset_store()
 
         origin = Origin.objects.create("http://example.org/",
-            BACKEND=ldtools.MemoryBackend())
+            BACKEND=MemoryBackend())
 
         self.assert_(not origin.has_unsaved_changes())
 
@@ -58,7 +57,7 @@ class OriginManagerCreateTestCase(unittest2.TestCase):
 
     def test_create_origin_causes_has_changes_state(self):
         origin = Origin.objects.create("http://example.org/",
-            BACKEND=ldtools.MemoryBackend())
+            BACKEND=MemoryBackend())
 
         origin.GET()
 

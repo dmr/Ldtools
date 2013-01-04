@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
+from ldtools.backends import MemoryBackend
+from ldtools.origin import Origin
+from ldtools.resource import Resource
 import os
 import unittest2
 
 import rdflib
 from rdflib import compare
-
-import ldtools
-from ldtools import Resource, Origin
 
 
 class SetupOriginMixin(object):
@@ -19,8 +19,7 @@ class SetupOriginMixin(object):
         with open(file_name, "r") as f:
             data = f.read()
         uri = "http://xmlns.com/foaf/0.1/"
-        return Origin.objects.create(uri,
-                                    BACKEND=ldtools.MemoryBackend(data))
+        return Origin.objects.create(uri, BACKEND=MemoryBackend(data))
 
 
 class OriginGETGraphTestCase(unittest2.TestCase, SetupOriginMixin):
