@@ -1,16 +1,22 @@
 # -*- coding: utf-8 -*-
-__version__ = "0.5.6"
-__useragent__ = ('ldtools-%s (http://github.com/dmr/ldtools, daniel@nwebs.de)'
-                 % __version__)
+from ldtools import __version__, url, author_email
+
+__useragent__ = 'ldtools-{version} ({url}, {author_email})'.format(
+    version=__version__, url=url, author_email=author_email
+)
+
+import socket
+# set socket timeout. URLError will occur if time passed
+socket.setdefaulttimeout(30)
 
 import datetime
 import logging
 import mimetypes
 import os
-import rdflib
 import shutil
 import urllib2
-import glob
+
+import rdflib
 
 # add mimetypes python does not know yet
 mimetypes.add_type("text/n3", ".n3")

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from ldtools.backends import __version__, url, author_email
+from ldtools import __version__, url, author_email
 
 import os
 from setuptools import setup #, find_packages
