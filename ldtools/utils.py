@@ -1,4 +1,17 @@
-import urlparse
+from __future__ import print_function
+
+# py3
+try:
+    import urlparse
+except ImportError:
+    import urllib.parse as urlparse
+
+# py3
+try:
+    import urllib2
+except:
+    import urllib.request as urllib2  # used in other modules
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -6,22 +19,33 @@ import rdflib
 from rdflib.namespace import split_uri
 
 
+def get_parsed_uri(uri, scheme_check=False):
+    parsed = urlparse.urlparse(uri)
+    if scheme_check:
+        if not parsed.scheme in ["http", "https"]:
+            raise ValueError(
+                "Not a URL. scheme is not http(s): %s" % parsed.scheme
+            )
+    uri = urlparse.urlunparse((
+        parsed.scheme,
+        parsed.netloc,
+        parsed.path,
+        parsed.params,
+        parsed.query,
+        ""
+    ))
+    return uri
+
+
 def is_valid_url(uri):
     if not uri:
         raise UriNotValid("An empty url is not valid")
-
-    parsed = urlparse.urlparse(uri)
-
-    if not parsed.scheme in ["http", "https"]:
-        logger.error("Not a URL. scheme is wrong: %s" % parsed.scheme)
+    try:
+        uri = get_parsed_uri(uri, scheme_check=True)
+    except ValueError:
         return False
-
     # TODO: implement canonalization of URI. Problem: graph comparison not
     # trivial
-
-    uri = urlparse.urlunparse((parsed.scheme, parsed.netloc, parsed.path,
-                         parsed.params, parsed.query,""))
-
     if not "http" in uri:
         return False
     return True
@@ -62,14 +86,10 @@ def get_rdflib_uriref(uri):
 
 def get_slash_url(uri):
     """Converts Hash to Slash uri http://www.w3.org/wiki/HashURI"""
-
     assert is_valid_url(uri)
     if not isinstance(uri, rdflib.URIRef):
         uri = get_rdflib_uriref(uri)
-
-    parsed = urlparse.urlparse(uri)
-    uri = urlparse.urlunparse((parsed.scheme, parsed.netloc, parsed.path,
-                         parsed.params, parsed.query,""))
+    uri = get_parsed_uri(uri)
     return rdflib.URIRef(uri)
 
 
@@ -77,16 +97,21 @@ def catchKeyboardInterrupt(func):
     def dec(*args, **kwargs):
         try:
             func(*args, **kwargs)
-        except KeyboardInterrupt, _e:
-            print 'KeyboardInterrupt --> Cancelling %s' % func
+        except KeyboardInterrupt:
+            print('KeyboardInterrupt --> Cancelling %s' % func)
     return dec
 
 
 def safe_dict(d):
     """Recursively clone json structure with UTF-8 dictionary keys"""
     if isinstance(d, dict):
-        return dict([(k.encode('utf-8'), safe_dict(v))
-        for k,v in d.iteritems()])
+        return dict([
+            (
+                k.decode('utf8') if not isinstance(k, str) else k,
+                safe_dict(v)
+            )
+            for k, v in d.items()
+        ])
     elif isinstance(d, list):
         return [safe_dict(x) for x in d]
     else:
@@ -94,10 +119,10 @@ def safe_dict(d):
 
 
 def reverse_dict(dct):
-    res = {}
-    for k,v in dct.iteritems():
-        res[v] = k
-    return safe_dict(res)
+    return safe_dict({
+        v: k
+        for k, v in dct.items()
+    })
 
 
 def predicate2pyattr(predicate, namespace_short_notation_reverse_dict):
@@ -105,6 +130,7 @@ def predicate2pyattr(predicate, namespace_short_notation_reverse_dict):
     assert prefix
     assert propertyname
 
+    # print ('predicate2pyattr', predicate, '-->', prefix, propertyname)
     #if not "_" in propertyname:
     #    logger.info("%s_%s may cause problems?" % (prefix, propertyname))
 
@@ -149,8 +175,7 @@ def pyattr2predicate(pyattr, namespace_dict):
     if "" in namespace_dict:
         if not prefix in namespace_dict:
             logger.error("problem. %s, %s" % (prefix, pyattr))
-            return rdflib.URIRef(u"%s%s"
-            % (namespace_dict[""], pyattr))
+            return rdflib.URIRef(u"%s%s" % (namespace_dict[""], pyattr))
     else:
         assert namespace_dict[prefix], (u"%s not in namespace_dict") % prefix
 

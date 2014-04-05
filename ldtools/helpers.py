@@ -1,3 +1,11 @@
+# -*- coding: utf-8 -*-
+from __future__ import print_function, unicode_literals
+
+try:
+    unicode
+except NameError:
+    basestring = unicode = str  # Python 3
+
 import logging
 import rdflib
 from rdflib import compare
@@ -31,10 +39,8 @@ def set_colored_logger(verbosity_level):
     logger = logging.getLogger()
     logger.addHandler(handler)
 
-
     logger2 = logging.getLogger("ldtools._add_property")
     logger2.setLevel(logging.INFO)
-
 
     mapper = {1: logging.DEBUG,
               2: logging.INFO,
@@ -65,7 +71,6 @@ def my_graph_diff(graph1, graph2):
             assert len(g2contexts) == 1
             graph2 = g2contexts[0]
 
-
     # Return if both graphs are isomorphic
     iso1 = compare.to_isomorphic(graph1)
     iso2 = compare.to_isomorphic(graph2)
@@ -80,7 +85,7 @@ def my_graph_diff(graph1, graph2):
         logger.debug(u"%s are isomorphic" % str_bit)
         return
 
-    print u"Differences between %s." % str_bit
+    print(u"Differences between %s." % str_bit)
 
     in_both, in_first, in_second = compare.graph_diff(iso1, iso2)
 
@@ -107,10 +112,10 @@ def my_graph_diff(graph1, graph2):
 
         lexer = web.XmlLexer()
         formatter = terminal.TerminalFormatter()
-        print highlight(u'\n'.join(diff), lexer, formatter)
+        print(highlight(u'\n'.join(diff), lexer, formatter))
     except ImportError:
         logger.info("Install pygments for colored diffs")
-        print u'\n'.join(diff)
+        print(u'\n'.join(diff))
     except UnicodeDecodeError:
-        print u"Only in first", unicode(sorted_first)
-        print u"Only in second", unicode(sorted_second)
+        print(u"Only in first", unicode(sorted_first))
+        print(u"Only in second", unicode(sorted_second))

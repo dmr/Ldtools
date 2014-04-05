@@ -3,8 +3,7 @@ from ldtools.resource import Resource
 from ldtools.utils import get_slash_url, get_rdflib_uriref
 
 
-def get_authoritative_resource(uri,
-        create_nonexistent_origin=True):
+def get_authoritative_resource(uri, create_nonexistent_origin=True):
     """Tries to return the Resource object from the authoritative origin uri"""
 
     uri = get_rdflib_uriref(uri)
@@ -18,8 +17,7 @@ def get_authoritative_resource(uri,
         if create_nonexistent_origin:
             origin, created = Origin.objects.get_or_create(uri=origin_uri)
         else:
-            raise Resource.DoesNotExist("No authoritative "
-                                        "Resource found for %s" %uri)
+            raise Resource.DoesNotExist("No authoritative Resource found for %s" %uri)
 
     if not origin.has_unsaved_changes():
         origin.GET(only_follow_uris=[], raise_errors=False)

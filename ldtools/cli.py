@@ -1,12 +1,13 @@
+from __future__ import print_function
+
 import logging
-import urllib2
 import pprint
 import datetime
 import sys
 
 import argparse
 
-from ldtools.utils import is_valid_url, get_slash_url, get_rdflib_uriref
+from ldtools.utils import is_valid_url, get_slash_url, get_rdflib_uriref, urllib2
 from ldtools.helpers import set_colored_logger
 from ldtools.backends import __version__
 from ldtools.origin import Origin
@@ -14,54 +15,67 @@ from ldtools.resource import Resource
 
 logger = logging.getLogger("ldtools.cli")
 
+
 def get_parser():
     parser = argparse.ArgumentParser()
 
     version_str = '%(prog)s ' + __version__
-    parser.add_argument('--version', action='version', version=version_str,
+    parser.add_argument(
+        '--version', action='version', version=version_str,
         help="Print current version")
 
-    parser.add_argument('-v', '--verbosity', action="store",
+    parser.add_argument(
+        '-v', '--verbosity', action="store",
         help='Adjust verbosity. 1 for every detail, 5 for silent',
         default=2, type=int)
 
-    parser.add_argument('-d', '--depth', action="store", default=0, type=int,
+    parser.add_argument(
+        '-d', '--depth', action="store", default=0, type=int,
         help="Crawl discovered Origins x times")
 
     follow_group = parser.add_mutually_exclusive_group()
-    follow_group.add_argument('--follow-all', action="store_true",
+    follow_group.add_argument(
+        '--follow-all', action="store_true",
         help="Follow all URIs discovered")
-    follow_group.add_argument('--follow-uris',
+    follow_group.add_argument(
+        '--follow-uris',
         action="append", dest='follow_uris', default=[],
         help="Follow the URIs specified")
 
     print_group = parser.add_mutually_exclusive_group()
-    print_group.add_argument('--only-print-uris', action="store_true",
+    print_group.add_argument(
+        '--only-print-uris', action="store_true",
         help='Only prints a short representation of Resources')
-    print_group.add_argument('--print-detailed-resources-limit',
+    print_group.add_argument(
+        '--print-detailed-resources-limit',
         action="store",
         help=('If more resources are discovered, only short representations '
               'will be printed'),
         default=300, type=int)
 
-    parser.add_argument('--only-print-uri-content', action="store_true",
+    parser.add_argument(
+        '--only-print-uri-content', action="store_true",
         help='Only prints data retrieved from URIs and exists')
 
-    parser.add_argument('--socket-timeout', action="store", type=int,
+    parser.add_argument(
+        '--socket-timeout', action="store", type=int,
         help="Set the socket timeout")
 
-    parser.add_argument('-o', '--only-negotiate', action="store_true",
+    parser.add_argument(
+        '-o', '--only-negotiate', action="store_true",
         help='Only do content negotiation for given URIs and print the '
              'response headers')
 
-    parser.add_argument('--GRAPH_SIZE_LIMIT', action="store", type=int,
+    parser.add_argument(
+        '--GRAPH_SIZE_LIMIT', action="store", type=int,
         help="Set maximum graph size that will be processed")
 
     def check_uri(url):
         if not is_valid_url(url):
             raise argparse.ArgumentTypeError("%r is not a valid URL" % url)
         return url
-    parser.add_argument('origin_urls', action="store", nargs='+', type=check_uri,
+    parser.add_argument(
+        'origin_urls', action="store", nargs='+', type=check_uri,
         help="Pass a list of URIs. ldtools will crawl them one by one")
 
     parser.add_argument('--print-all-resources', action="store_true")
@@ -125,24 +139,16 @@ def execute_ldtools(
         origin, created = Origin.objects.get_or_create(url)
         logger.info("Retrieving content of %s" % origin.uri)
 
-        if only_negotiate:
+        if only_negotiate or only_print_uri_content:
             try:
-                data = origin.backend.GET(uri=origin.uri,
+                data = origin.backend.GET(
+                    uri=origin.uri,
                     httphandler=urllib2.HTTPHandler(debuglevel=1))
-            except Exception as e:
-                print e.message
-
-        elif only_print_uri_content:
-            try:
-                data = origin.backend.GET(uri=origin.uri,
-                    httphandler=urllib2.HTTPHandler(debuglevel=1))
-                print
-                print data
-                print
-            except Exception as e:
-                print
-                print e
-
+            except Exception as exc:
+                print(exc)
+                continue
+            if only_print_uri_content:
+                print('\n', data, '\n')
         else:
             origin.GET(only_follow_uris=only_follow_uris, **kw)
 
@@ -161,25 +167,29 @@ def execute_ldtools(
             if r._uri == get_rdflib_uriref(orig_url):
                 logger.info(
                     u"Printing all available information about {0}".format(r._uri))
-                if hasattr(r, "_has_changes"): delattr(r, "_has_changes")
-                if hasattr(r, "pk"): delattr(r, "pk")
-                pprint.pprint(r.__dict__); print
+                if hasattr(r, "_has_changes"):
+                    delattr(r, "_has_changes")
+                if hasattr(r, "pk"):
+                    delattr(r, "pk")
+                pprint.pprint(r.__dict__)
 
     if print_all_resources:
         all_resources = Resource.objects.all()
-        if (len(all_resources) > print_detailed_resources_limit
-            or only_print_uris):
-            logger.warning("ldtools discovered more than %s Resource objects, "
+        if (len(all_resources) > print_detailed_resources_limit or only_print_uris):
+            logger.warning(
+                "ldtools discovered more than %s Resource objects, "
                 "only printing titles of the %s Resources discovered"
-                % (print_detailed_resources_limit, len(all_resources)))
+                % (print_detailed_resources_limit, len(all_resources))
+            )
             for resource in all_resources:
-                print resource
+                print(resource)
         else:
-            print
             for r in all_resources:
-                if hasattr(r, "_has_changes"): delattr(r, "_has_changes")
-                if hasattr(r, "pk"): delattr(r, "pk")
-                pprint.pprint(r.__dict__); print
+                if hasattr(r, "_has_changes"):
+                    delattr(r, "_has_changes")
+                if hasattr(r, "pk"):
+                    delattr(r, "pk")
+                pprint.pprint(r.__dict__)
 
 
 def main():

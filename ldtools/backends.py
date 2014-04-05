@@ -7,16 +7,17 @@ __useragent__ = 'ldtools-{version} ({url}, {author_email})'.format(
 
 import socket
 # set socket timeout. URLError will occur if time passed
-socket.setdefaulttimeout(30)
+socket.setdefaulttimeout(5)
 
 import datetime
 import logging
 import mimetypes
 import os
 import shutil
-import urllib2
-
+import socket
 import rdflib
+
+from ldtools.utils import urllib2
 
 # add mimetypes python does not know yet
 mimetypes.add_type("text/n3", ".n3")
@@ -26,6 +27,8 @@ mimetypes.add_type("text/turtle", ".n3")
 
 class FiletypeMappingError(Exception):
     pass
+
+
 class ContentNegotiationError(Exception):
     pass
 
@@ -40,9 +43,8 @@ def get_file_extension(filename):
 
 def assure_parser_plugin_exists(format):
     try:
-        rdflib.graph.plugin.get(name=format,
-                            kind=rdflib.parser.Parser)
-    except rdflib.plugin.PluginException as e:
+        rdflib.graph.plugin.get(name=format, kind=rdflib.parser.Parser)
+    except rdflib.plugin.PluginException:
         msg = "No parser plugin found for %s" % format
         logger.error(msg)
         raise ContentNegotiationError(msg)
@@ -58,6 +60,7 @@ class AbstractBackend(object):
     """Abstract Backend. Overwrite in subclasses"""
     pass
 
+
 class RestBackend(AbstractBackend):
     GET_headers = {
         'User-agent': __useragent__,
@@ -72,15 +75,16 @@ class RestBackend(AbstractBackend):
         )
     }
 
-    PUT_headers={
+    PUT_headers = {
         "User-Agent": __useragent__,
     }
 
-    def GET(self,
-            uri,
-            extra_headers=None,
-            httphandler=None,
-        ):
+    def GET(
+        self,
+        uri,
+        extra_headers=None,
+        httphandler=None,
+    ):
         """Lookup URI and follow redirects. Return data"""
 
         if not hasattr(self, "uri"):
@@ -105,14 +109,16 @@ class RestBackend(AbstractBackend):
 
         request = urllib2.Request(url=uri, headers=self.GET_headers)
 
-        result_file = opener.open(request)
+        try:
+            result_file = opener.open(request)
+        except (UnicodeEncodeError, socket.timeout):
+            return None
 
         now = datetime.datetime.now()
         self.lookup_time = now - reference_time
 
         if result_file.geturl() != uri:
-            logger.info("%s was redirected. Content url: %r" % (uri,
-                                                     result_file.geturl()))
+            logger.info("%s was redirected. Content url: %r" % (uri, result_file.geturl()))
 
         if "Content-Length" in result_file.headers:
             logger.info("Content-Length: %s"
@@ -134,11 +140,9 @@ class RestBackend(AbstractBackend):
         try:
             file_extension = mimetypes.guess_extension(self.content_type)
             assert file_extension
-        except AssertionError as e:
-            logger.error("%s not supported by ldtools"
-                         % result_file.headers['Content-Type'])
-            raise FiletypeMappingError("No mimetype found for %s"
-                                   % self.content_type)
+        except AssertionError:
+            logger.error("%s not supported by ldtools" % result_file.headers['Content-Type'])
+            raise FiletypeMappingError("No mimetype found for %s" % self.content_type)
 
         format = file_extension.strip(".")
 
@@ -150,7 +154,6 @@ class RestBackend(AbstractBackend):
 
         self.format = format
         return result_file.read()
-
 
     def PUT(self, data):
         assert self.uri, "GET has to be called before PUT possible"
@@ -166,6 +169,7 @@ class RestBackend(AbstractBackend):
                                   headers=self.PUT_headers)
         request.get_method = lambda: 'PUT'
         response = opener.open(request)
+        return response
 
 
 class FileBackend(AbstractBackend):
@@ -222,8 +226,7 @@ class FileBackend(AbstractBackend):
             f.write(data)
 
     def revert_to_old_version(self):
-        assert self.store_old_versions, ("This FileBackend is not configured "
-            "to store old versions")
+        assert self.store_old_versions, ("This FileBackend is not configured to store old versions")
         if hasattr(self, "old_version"):
             logger.info("Reverting to version before last saved version")
             shutil.copy(self.old_version, self.filename)

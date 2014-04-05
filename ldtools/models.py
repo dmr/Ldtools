@@ -1,4 +1,13 @@
+# -*- coding: utf-8 -*-
+from __future__ import print_function, unicode_literals
+
+try:
+    unicode
+except NameError:
+    basestring = unicode = str  # Python 3
+
 import rdflib
+import six
 
 
 class DoesNotExist(Exception):
@@ -16,6 +25,7 @@ class Field(object):
         if value is None:
             value = ''
         return value
+
     def to_python(self, value=None):
         return value
 
@@ -28,12 +38,13 @@ class StringField(Field):
 class URIRefField(Field):
     def to_python(self, value=None):
         if value:
-            if (not isinstance(value, (rdflib.URIRef, rdflib.BNode))\
-                or isinstance(value, rdflib.Literal)):
+            if (not isinstance(value, (rdflib.URIRef, rdflib.BNode)) or isinstance(value, rdflib.Literal)):
                 raise ValueError("please pass uriref!")
         else:
             value = rdflib.URIRef(u'')
         return value
+
+
 class ObjectField(Field):
     def to_python(self, value=None):
         return value
@@ -43,14 +54,86 @@ class Options(object):
 
     def __init__(self, meta, attrs):
         fields = []
-        for obj_name, obj in attrs.iteritems():
+        for obj_name, obj in attrs.items():
             if isinstance(obj, Field):
                 fields.append((obj_name, obj))
         self.fields = dict(fields)
 
 
-class ModelMeta(type):
+class ManagerDescriptor(object):
+    # This class ensures managers aren't accessible via model instances.
+    # Poll.objects works, but poll_obj.objects raises AttributeError.
+    def __init__(self, manager):
+        self.manager = manager
 
+    def __get__(self, instance, type=None):
+        if instance is not None:
+            raise AttributeError("Manager isn't accessible via %s instances"
+                                 % type.__name__)
+        return self.manager
+
+
+class Manager(object):
+    def __init__(self):
+        self.model = None
+        self.reset_store()
+
+    def contribute_to_class(self, model, name):
+        self.model = model
+        setattr(model, name, ManagerDescriptor(self))
+
+    def reset_store(self):
+        self._storage = {}
+
+    def all(self):
+        return self._storage.values()
+
+    def filter_has_key(self, key):
+        key = unicode(key)
+        func = lambda obj: key in [unicode(k) for k in obj.__dict__.keys()]
+        res = filter(func, self.all())
+
+        # py3: in python3 filter returns a filter instance --> list cast
+        if not isinstance(res, list):
+            res = list(res)
+
+        return res
+
+    def filter(self, **kwargs):
+        def check_if_equals_or_in_set(key_n_value):
+            """helper method for loop. Convenient but maybe hacky: checks
+            if value is in attr or if iterable inside the set/list"""
+            key, value = key_n_value
+            if hasattr(item, key):
+                items_value = getattr(item, key)
+                if type(items_value) in (list, set):
+                    for items_value in items_value:
+                        if items_value == value:
+                            return True
+                else:
+                    if items_value == value:
+                        return True
+            return False
+
+        for item in self.all():
+            if all(map(check_if_equals_or_in_set, kwargs.items())):
+                yield item
+
+    def create(self, pk, **kwargs):
+        kwargs['pk'] = pk
+        instance = self.model(**kwargs)
+        assert not pk in self._storage, ("%s object with pk %s already exists!" % (self.model, pk))
+        self._storage[pk] = instance
+        return instance
+
+    def get(self, pk):
+        if pk in self._storage:
+            return self._storage[pk]
+        else:
+            raise self.model.DoesNotExist
+
+
+class ModelMeta(type):
     def __new__(cls, name, bases, attrs):
         super_new = super(ModelMeta, cls).__new__
         parents = [b for b in bases if isinstance(b, ModelMeta)]
@@ -70,7 +153,7 @@ class ModelMeta(type):
         setattr(new_cls, '_meta', Options(meta, attrs))
 
         # Add all attributes to the class.
-        for obj_name, obj in attrs.iteritems():
+        for obj_name, obj in attrs.items():
             if isinstance(obj, Manager):
                 obj.contribute_to_class(new_cls, obj_name)
             else:
@@ -80,14 +163,11 @@ class ModelMeta(type):
             new_cls.__unicode__ = lambda self: self.pk
         if not hasattr(new_cls, '__str__'):
             new_cls.__str__ = lambda self: self.__unicode__()
-        new_cls.__repr__ = lambda self: u'<%s: %s>' % (
-                self.__class__.__name__, self.__unicode__())
+        new_cls.__repr__ = lambda self: u'<%s: %s>' % (self.__class__.__name__, self.__unicode__())
         return new_cls
 
 
-class Model(object):
-
-    __metaclass__ = ModelMeta
+class Model(six.with_metaclass(ModelMeta)):
     MultipleObjectsReturned = MultipleObjectsReturned
     DoesNotExist = DoesNotExist
 
@@ -95,7 +175,7 @@ class Model(object):
         self.pk = pk
 
         # Set the defined modelfields properly
-        for attr_name, field in self._meta.fields.iteritems():
+        for attr_name, field in self._meta.fields.items():
             if attr_name in kwargs:
                 attr = kwargs.pop(attr_name)
                 value = field.to_python(attr)
@@ -108,8 +188,7 @@ class Model(object):
             setattr(self, attr_name, value)
 
         if kwargs:
-            raise ValueError('%s are not part of the schema for %s'
-                % (', '.join(kwargs.keys()), self.__class__.__name__))
+            raise ValueError('%s are not part of the schema for %s' % (', '.join(kwargs.keys()), self.__class__.__name__))
 
     def __eq__(self, other):
         if not type(other) == type(self):
@@ -143,72 +222,3 @@ class Model(object):
         # It is wrong to really compare the object here. This case is
         # important to work with references in set() instances for instance
         return hash(self.pk)
-
-
-class ManagerDescriptor(object):
-    # This class ensures managers aren't accessible via model instances.
-    # Poll.objects works, but poll_obj.objects raises AttributeError.
-    def __init__(self, manager):
-        self.manager = manager
-
-    def __get__(self, instance, type=None):
-        if instance != None:
-            raise AttributeError("Manager isn't accessible via %s instances"
-                                 % type.__name__)
-        return self.manager
-
-
-class Manager(object):
-
-    def __init__(self):
-        self.model = None
-        self.reset_store()
-
-    def contribute_to_class(self, model, name):
-        self.model = model
-        setattr(model, name, ManagerDescriptor(self))
-
-    def reset_store(self):
-        self._storage = {}
-
-    def all(self):
-        return self._storage.values()
-
-    def filter_has_key(self, key):
-        key = unicode(key)
-        func = lambda obj: key in [unicode(k) for k in \
-                                        obj.__dict__.keys()]
-        return filter(func, self.all())
-
-    def filter(self, **kwargs):
-        def check_if_equals_or_in_set((key, value)):
-            """helper method for loop. Convenient but maybe hacky: checks
-            if value is in attr or if iterable inside the set/list"""
-            if hasattr(item, key):
-                items_value = getattr(item, key)
-                if type(items_value) in [list, set]:
-                    for items_value in items_value:
-                        if items_value == value:
-                            return True
-                else:
-                    if items_value == value:
-                        return True
-            return False
-
-        for item in self.all():
-            if all(map(check_if_equals_or_in_set, kwargs.items())):
-                yield item
-
-    def create(self, pk, **kwargs):
-        kwargs['pk'] = pk
-        instance = self.model(**kwargs)
-        assert not pk in self._storage, ("%s object with pk %s already exists!"
-            % (self.model, pk))
-        self._storage[pk] = instance
-        return instance
-
-    def get(self, pk):
-        if pk in self._storage:
-            return self._storage[pk]
-        else:
-            raise self.model.DoesNotExist

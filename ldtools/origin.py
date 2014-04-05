@@ -1,4 +1,11 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function, unicode_literals
+
+try:
+    unicode
+except NameError:
+    basestring = unicode = str  # Python 3
+
 import datetime
 import rdflib
 from xml.sax._exceptions import SAXParseException
@@ -7,25 +14,25 @@ logger = logging.getLogger(__name__)
 
 from rdflib import compare
 
-from ldtools.backends import RestBackend
+from ldtools.backends import RestBackend, ContentNegotiationError
 from ldtools.resource import Resource
 from ldtools.models import Manager, Model, URIRefField, ObjectField
 from ldtools.utils import (
     get_rdflib_uriref, get_slash_url,
     catchKeyboardInterrupt, is_valid_url, reverse_dict, safe_dict,
-    pyattr2predicate
+    pyattr2predicate,
+    urllib2
 )
+from ldtools.helpers import my_graph_diff
 
 
 class OriginManager(Manager):
-
     def post_create_hook(self, origin):
         # hook to be overwritten but using application
         # origin.timedelta = datetime.timedelta(minutes=2)
         return origin
 
     def create(self, uri, BACKEND=None):
-
         uri = get_rdflib_uriref(uri)
         if not uri == get_slash_url(uri):
             msg = ("URI passed to Origin Manager was not a slash URI: %s. "
@@ -34,7 +41,8 @@ class OriginManager(Manager):
             uri = get_slash_url(uri)
 
         backend = BACKEND if BACKEND else RestBackend()
-        origin = super(OriginManager, self).create(pk=uri, uri=uri,
+        origin = super(OriginManager, self).create(
+            pk=uri, uri=uri,
             backend=backend)
         return self.post_create_hook(origin)
 
@@ -43,8 +51,7 @@ class OriginManager(Manager):
         uri = get_rdflib_uriref(uri)
         return super(OriginManager, self).get(pk=uri)
 
-    def get_or_create(self, uri,
-            **kwargs):
+    def get_or_create(self, uri, **kwargs):
 
         uri = get_rdflib_uriref(uri)
         if not uri == get_slash_url(uri):
@@ -54,7 +61,8 @@ class OriginManager(Manager):
             uri = get_slash_url(uri)
 
         try:
-            if kwargs: logger.warning("kwargs are ignored for get.")
+            if kwargs:
+                logger.warning("kwargs are ignored for get.")
             return self.get(uri), False
         except self.model.DoesNotExist:
             return self.create(uri, **kwargs), True
@@ -65,19 +73,38 @@ class OriginManager(Manager):
         func = lambda origin: True if not origin.processed else False
         for _i in range(depth):
             crawl = filter(func, self.all())
+            if not isinstance(crawl, list):  # py3
+                crawl = list(crawl)
             if crawl:
                 for origin in crawl:
                     origin.GET(raise_errors=False, **kwargs)
 
 
-class Origin(Model):
+def triple_yield(resource, property, v):
+    if isinstance(v, resource.__class__):
+        # If object is referenced in attribute, "de-reference"
+        return ((resource._uri, property, v._uri))
+    else:
+        if not hasattr(v, "n3"):
+            # print only newly added values without the correct
+            # type are handled here
 
+            # float has no attribute startswith
+            if (hasattr(v, "startswith") and v.startswith("http://")):
+                v = rdflib.URIRef(v)
+            else:
+                v = rdflib.Literal(v)
+        return ((resource._uri, property, v))
+
+
+class Origin(Model):
     uri = URIRefField()
     objects = OriginManager()
     backend = ObjectField()
 
     def add_error(self, error):
-        if not hasattr(self, 'errors'): self.errors = []
+        if not hasattr(self, 'errors'):
+            self.errors = []
         self.errors.append(error)
 
     def __init__(self, pk=None, **kwargs):
@@ -85,22 +112,26 @@ class Origin(Model):
         self.processed = False
 
     def __unicode__(self):
-        str = [unicode(self.uri)]
-        str.append(self.backend.__class__.__name__)
+        extras = []
         if hasattr(self, 'errors'):
             for error in self.errors:
-                str.append(unicode(error))
+                extras.append(unicode(error))
         if self.processed:
-            str.append(u"Processed")
-        return u" ".join(str)
+            extras.append(u"Processed")
 
-    def GET(self,
-            GRAPH_SIZE_LIMIT=30000,
-            only_follow_uris=None,
-            handle_owl_imports=False,
-            raise_errors=True,
-            skip_urls=None,
-            httphandler=None,
+        return u" ".join([
+            unicode(self.uri),
+            self.backend.__class__.__name__,
+        ] + extras)
+
+    def GET(
+        self,
+        GRAPH_SIZE_LIMIT=30000,
+        only_follow_uris=None,
+        handle_owl_imports=False,
+        raise_errors=True,
+        skip_urls=None,
+        httphandler=None,
     ):
 
         if not self.uri:
@@ -126,33 +157,36 @@ class Origin(Model):
         if hasattr(self, "timedelta") and hasattr(self, 'last_processed'):
             time_since_last_processed = now - self.last_processed
             if (time_since_last_processed < self.timedelta):
-                logger.info("Not processing %s again because was processed "
-                            "only %s ago" % (self.uri, time_since_last_processed))
+                logger.info("Not processing %s again because was processed only %s ago" % (self.uri, time_since_last_processed))
                 return
-
-        self.last_processed = now
+            self.last_processed = now
 
         try:
-            data = self.backend.GET(self.uri,
-                httphandler=httphandler)
+            data = self.backend.GET(self.uri, httphandler=httphandler)
         except urllib2.HTTPError as e:
             if e.code in [
                 401,
                 403,
-                503, # Service Temporarily Unavailable
-                404, # Not Found
+                503,  # Service Temporarily Unavailable
+                404,  # Not Found
             ]:
                 self.add_error(e.code)
-            if raise_errors: raise e
-            else: return
+            if raise_errors:
+                raise e
+            else:
+                return
         except urllib2.URLError as e:
             self.add_error("timeout")
-            if raise_errors: raise e
-            else: return
+            if raise_errors:
+                raise e
+            else:
+                return
         except ContentNegotiationError as e:
             logger.error(e.message)
-            if raise_errors: raise e
-            else: return
+            if raise_errors:
+                raise e
+            else:
+                return
 
         graph = rdflib.graph.ConjunctiveGraph(identifier=self.uri)
 
@@ -164,9 +198,7 @@ class Origin(Model):
 
                 reference_time = datetime.datetime.now()
 
-                graph.parse(data=data,
-                    publicID=publicID,
-                    format=self.backend.format)
+                graph.parse(data=data, publicID=publicID, format=self.backend.format)
 
                 now = datetime.datetime.now()
                 self.graph_parse_time = now - reference_time
@@ -176,18 +208,24 @@ class Origin(Model):
         except SAXParseException as e:
             self.add_error("SAXParseException")
             logger.error("SAXParseException: %s" % self)
-            if raise_errors: raise e
-            else: return
+            if raise_errors:
+                raise e
+            else:
+                return
         except rdflib.exceptions.ParserError as e:
             self.add_error("ParserError")
             logger.error("ParserError: %s" % self)
-            if raise_errors: raise e
-            else: return
+            if raise_errors:
+                raise e
+            else:
+                return
         except IOError as e:
             self.add_error("IOError")
             logger.error("IOError: %s" % self)
-            if raise_errors: raise e
-            else: return
+            if raise_errors:
+                raise e
+            else:
+                return
 
         self.processed = True
 
@@ -223,7 +261,7 @@ class Origin(Model):
                 return
             else:
                 logging.warning("GET retrieved updates for %s!" % self.uri)
-                helpers.my_graph_diff(self._graph, graph)
+                my_graph_diff(self._graph, graph)
 
                 for resource in self.get_resources():
                     resource.delete()
@@ -251,48 +289,22 @@ class Origin(Model):
         if not hasattr(self, '_graph'):
             if hasattr(self, 'errors') and len(self.errors) != 0:
                 logging.error("Origin %s has Errors --> can't process "
-                              ".get_graph()"
-                % self.uri)
+                              ".get_graph()" % self.uri)
                 return graph
-            assert hasattr(self, "_graph"), ("graph has to be "
-                                             "processed before executing get_graph()")
+            assert hasattr(self, "_graph"), ("graph has to be processed before executing get_graph()")
 
         # Problems with namespacemapping here:
         #  1) namespace bindings are not really necessary to validate
         #     isomorphic graphs but the resulting graph is is different
         #     if they miss
         #  2) doesn't detect duplicate definitions of namespaces
-        namespace_dict = dict(self._graph.namespace_manager.namespaces())
+        namespace_dict = safe_dict(dict(self._graph.namespace_manager.namespaces()))
 
         for prefix, namespace in safe_dict(namespace_dict).items():
             graph.bind(prefix=prefix, namespace=namespace)
         new_ns = dict(graph.namespace_manager.namespaces())
 
-        assert namespace_dict == new_ns, [(k, v)
-        for k, v in safe_dict(namespace_dict).items()\
-        if not k in safe_dict(new_ns).keys()]
-
-
-        def do_yield_triple(resource, property, v):
-            if isinstance(v, resource.__class__):
-                # If object is referenced in attribute, "de-reference"
-                return ((resource._uri, property, v._uri))
-            else:
-
-                if not hasattr(v, "n3"):
-                    # print only newly added values without the correct
-                    # type are handled here
-
-                    # float has no attribute startswith
-                    if (hasattr(v, "startswith")
-                        and v.startswith("http://")
-                        ):
-                        v = rdflib.URIRef(v)
-                    else:
-                        v = rdflib.Literal(v)
-
-                return ((resource._uri, property, v))
-
+        assert namespace_dict == new_ns, [(k, v) for k, v in safe_dict(namespace_dict).items() if not k in safe_dict(new_ns).keys()]
 
         for resource in self.get_resources():
             # __dict__ converts rdflib.urirefs to strings for keys -->
@@ -310,15 +322,14 @@ class Origin(Model):
                 else:
                     property = pyattr2predicate(property, namespace_dict)
 
-                assert isinstance(property, rdflib.URIRef),\
-                "property %s is not a URIRef object" % property
+                assert isinstance(property, rdflib.URIRef), "property %s is not a URIRef object" % property
 
                 if isinstance(values, set):
                     for v in values:
-                        graph.add( do_yield_triple(resource, property, v) )
+                        graph.add(triple_yield(resource, property, v))
                 else:
                     v = values
-                    graph.add( do_yield_triple(resource, property, v) )
+                    graph.add(triple_yield(resource, property, v))
 
         return graph
 
@@ -327,10 +338,10 @@ class Origin(Model):
 
     def has_unsaved_changes(self):
         # objects with changed attributes exist
-        if any(resource._has_changes
-            for resource in self.get_resources()\
-            if (hasattr(resource, '_has_changes')
-                and resource._has_changes == True)):
+        if any(
+            resource._has_changes
+            for resource in self.get_resources() if (hasattr(resource, '_has_changes') and resource._has_changes is True)
+        ):
             return True
         return False
 
@@ -360,8 +371,7 @@ def check_shortcut_consistency():
     global_namespace_dict = {}
     for origin in Origin.objects.all():
         if hasattr(origin, "_graph"):
-            for k, v in dict(origin._graph.namespace_manager\
-            .namespaces()).items():
+            for k, v in safe_dict(origin._graph.namespace_manager.namespaces()):
                 if k in global_namespace_dict:
                     assert global_namespace_dict[k] == v
                 else:
@@ -370,19 +380,22 @@ def check_shortcut_consistency():
 
 class GraphHandler(object):
     def __init__(self, origin, only_follow_uris, handle_owl_imports):
-        self.origin=origin
-
-        self.handle_owl_imports=handle_owl_imports
+        self.origin = origin
+        self.handle_owl_imports = handle_owl_imports
         if only_follow_uris is not None:
-            only_follow_uris = [rdflib.URIRef(u) if not\
-            isinstance(u, rdflib.URIRef) else u for u in only_follow_uris]
-        self.only_follow_uris=only_follow_uris
+            only_follow_uris = [
+                rdflib.URIRef(u) if not
+                isinstance(u, rdflib.URIRef) else u for u in only_follow_uris
+            ]
+        self.only_follow_uris = only_follow_uris
 
     def populate_resources(self, graph):
-        namespace_short_notation_reverse_dict = reverse_dict(
-            dict(graph.namespace_manager.namespaces())
-        )
-
+        namespace_short_notation_reverse_dict = {
+            unicode(rdflib_url): prefix
+            for rdflib_url, prefix in reverse_dict(
+                safe_dict(dict(graph.namespace_manager.namespaces()))
+            ).items()
+        }
         reference_time = datetime.datetime.now()
 
         for subject, predicate, obj_ect in graph:
@@ -392,8 +405,7 @@ class GraphHandler(object):
             assert predicate.encode('utf8')
 
             if self.handle_owl_imports:
-                if (predicate == rdflib.OWL.imports
-                    and type(obj_ect) == rdflib.URIRef):
+                if (predicate == rdflib.OWL.imports and type(obj_ect) == rdflib.URIRef):
 
                     uri = get_slash_url(obj_ect)
                     origin, created = Origin.objects.get_or_create(uri=uri)
@@ -402,9 +414,7 @@ class GraphHandler(object):
                                 "first" % (origin.uri))
                     origin.GET()
 
-            if ((self.only_follow_uris is not None
-                 and predicate in self.only_follow_uris)
-                or self.only_follow_uris is None):
+            if ((self.only_follow_uris is not None and predicate in self.only_follow_uris) or self.only_follow_uris is None):
 
                 if type(obj_ect) == rdflib.URIRef:
                     # wrong scheme mailto, tel, callto --> should be Literal?
@@ -412,10 +422,8 @@ class GraphHandler(object):
                         obj_uriref = get_slash_url(obj_ect)
                         Origin.objects.get_or_create(uri=obj_uriref)
 
-            resource, _created = Resource.objects.get_or_create(uri=subject,
-                origin=self.origin)
-            resource._add_property(predicate, obj_ect,
-                namespace_short_notation_reverse_dict)
+            resource, _created = Resource.objects.get_or_create(uri=subject, origin=self.origin)
+            resource._add_property(predicate, obj_ect, namespace_short_notation_reverse_dict)
 
         now = datetime.datetime.now()
         self.origin.graph_handler_time = now - reference_time
