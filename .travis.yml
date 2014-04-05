@@ -2,7 +2,7 @@ language: python
 python:
  - "2.7"
  - "3.3"
- - "3.4"
+# - "3.4"  # travis does not support 3.4 yet
 
 install: python setup.py -q install
 script: nosetests --with-coverage --cover-package=ldtools
