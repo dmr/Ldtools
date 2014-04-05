@@ -13,7 +13,7 @@ setup(
     license='BSD',
     author='Daniel Rech',
     author_email=author_email,
-    description='A lightweight ORM for Linked Data',
+    description='A lightweight ORM for Linked Data: Consume Linked Data resources, modify the graph and write the changes back to their original source',
     long_description=README,
 
     packages=["ldtools"],
@@ -33,9 +33,7 @@ setup(
 
     extras_require={
         'test': [
-            "unittest2",
-            "spec",
-            "nose>=1.1,<1.2",
+            "nose>=1.1",
         ],
     },
     test_suite='nose.collector',
