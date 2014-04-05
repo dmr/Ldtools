@@ -1,4 +1,5 @@
-import unittest2
+from unittest import TestCase
+
 import datetime
 
 from ldtools.backends import MemoryBackend
@@ -10,7 +11,7 @@ cnt = lambda: (len(Origin.objects.all()),
                len(Resource.objects.all()))
 
 
-class GraphHandlerTestCase(unittest2.TestCase):
+class GraphHandlerTestCase(TestCase):
 
     def _setUpScenario(self):
         Resource.objects.reset_store()
@@ -36,7 +37,6 @@ class GraphHandlerTestCase(unittest2.TestCase):
         # nothing to assure?
 
     def test_prevent_recrawl_by_setting_timedelta(self):
-
         old_post_create_hook = Origin.objects.post_create_hook
 
         # customize Origin.objects.post_create_hook for performance reasons
@@ -50,6 +50,7 @@ class GraphHandlerTestCase(unittest2.TestCase):
         self.origin.GET()
 
         # nothing to assure?
-        # TODO: modify origin in between --> delete all resources and regenerate
+        # TODO: modify origin in the meantime -->
+        # delete all resources and regenerate
 
         Origin.objects.post_create_hook = old_post_create_hook

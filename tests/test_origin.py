@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
-import unittest2
+from unittest import TestCase
 
 from ldtools.origin import Origin
 from ldtools.resource import Resource
 from ldtools.backends import MemoryBackend
 
 
-class OriginIsDirtyTestCase(unittest2.TestCase):
+class OriginIsDirtyTestCase(TestCase):
     def setUp(self):
         Origin.objects.reset_store()
         Resource.objects.reset_store()
 
-        origin = Origin.objects.create("http://example.org/",
-            BACKEND=MemoryBackend())
+        origin = Origin.objects.create("http://example.org/", BACKEND=MemoryBackend())
 
         self.assert_(not origin.has_unsaved_changes())
 
@@ -22,8 +21,7 @@ class OriginIsDirtyTestCase(unittest2.TestCase):
         self.assertEqual(len(list(Origin.objects.all())), 1)
         self.assert_(origin.processed)
 
-        resource = Resource.objects.create("http://example.org/test1",
-            origin=origin)
+        resource = Resource.objects.create("http://example.org/test1", origin=origin)
 
         self.assertEqual(len(list(Resource.objects.all())), 1)
         self.assertEqual(len(list(Origin.objects.all())), 1)
@@ -42,7 +40,7 @@ class OriginIsDirtyTestCase(unittest2.TestCase):
         self.assert_(not self.origin.has_unsaved_changes())
 
 
-class OriginManagerCreateTestCase(unittest2.TestCase):
+class OriginManagerCreateTestCase(TestCase):
     def setUp(self):
         Origin.objects.reset_store()
         Resource.objects.reset_store()
@@ -56,8 +54,7 @@ class OriginManagerCreateTestCase(unittest2.TestCase):
         self.assertEquals(str(r.uri), uri)
 
     def test_create_origin_causes_has_changes_state(self):
-        origin = Origin.objects.create("http://example.org/",
-            BACKEND=MemoryBackend())
+        origin = Origin.objects.create("http://example.org/", BACKEND=MemoryBackend())
 
         origin.GET()
 
@@ -65,8 +62,7 @@ class OriginManagerCreateTestCase(unittest2.TestCase):
         self.assertEqual(len(list(Origin.objects.all())), 1)
         self.assert_(origin.processed)
 
-        resource = Resource.objects.create("http://example.org/test1",
-            origin=origin)
+        resource = Resource.objects.create("http://example.org/test1", origin=origin)
 
         self.assertEqual(len(list(Resource.objects.all())), 1)
         self.assertEqual(len(list(Origin.objects.all())), 1)

@@ -7,7 +7,7 @@ install: python setup.py -q install
 script: nosetests --with-coverage --cover-package=ldtools
 
 before_install:
- - pip install unittest2 spec
+ - pip install spec
 
 notifications:
   email:

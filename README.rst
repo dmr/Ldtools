@@ -79,7 +79,7 @@ Tests
 
 To run the tests, install spec and/or nose and run nose::
 
-    pip install spec unittest2 coverage
+    pip install spec coverage
     nosetests --with-coverage --cover-package=ldtools
     nosetests --with-specplugin
 

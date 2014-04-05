@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 import rdflib
-import unittest2
-import urlparse
+from unittest import TestCase
+from ldtools.utils import urlparse
 
-class TestUrlparse(unittest2.TestCase):
+
+class TestUrlparse(TestCase):
     def test_hash1(self):
         uri = "http://www.cwi.nl:80/%7Eguido/Python.html"
         o = urlparse.urlparse(uri)
@@ -17,10 +18,10 @@ class TestUrlparse(unittest2.TestCase):
     def test_hash3(self):
         uri = "http://www.cwi.nl:80/%7Eguido/Python.html#bla"
         r = urlparse.urlsplit(uri)
-        self.assertEqual(r.geturl(),
-                         "http://www.cwi.nl:80/%7Eguido/Python.html#bla")
+        self.assertEqual(r.geturl(), "http://www.cwi.nl:80/%7Eguido/Python.html#bla")
 
-class TestRdflibLiterals(unittest2.TestCase):
+
+class TestRdflibLiterals(TestCase):
     def test_1(self):
         self.assertNotEquals(rdflib.Literal('TimBL'), rdflib.Literal('timbl'))
         self.assertNotIn(rdflib.Literal('TimBL'),

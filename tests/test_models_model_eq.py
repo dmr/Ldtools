@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
-import unittest2
+from unittest import TestCase
 import copy
+from ldtools import models
+
 
 class Myobject(object):
     def __eq__(self, other):
@@ -36,8 +38,8 @@ class Myobject(object):
         # important to work with references in set() instances for instance
         return hash(self.pk)
 
-    
-class HashAndEqTest(unittest2.TestCase):
+
+class HashAndEqTest(TestCase):
     def test_it(self):
         a = Myobject()
         a.pk = 1
@@ -63,11 +65,7 @@ class HashAndEqTest(unittest2.TestCase):
         assert a == b
 
 
-
-from ldtools import models
-
-
-class ModelEqualityAndHashFunctionTestCase(unittest2.TestCase):
+class ModelEqualityAndHashFunctionTestCase(TestCase):
     def _create_objects(self, *objects):
         class SampleEquality(models.Model):
             attr1 = models.StringField()

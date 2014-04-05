@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-import unittest2
+from unittest import TestCase
 
 from ldtools.resource import Resource
 from ldtools.backends import MemoryBackend
 from ldtools.origin import Origin, check_shortcut_consistency
 
 
-class NamespaceShortcutConsistencyTestCase(unittest2.TestCase):
+class NamespaceShortcutConsistencyTestCase(TestCase):
     def setUp(self):
         Origin.objects.reset_store()
         Resource.objects.reset_store()
@@ -24,14 +24,12 @@ class NamespaceShortcutConsistencyTestCase(unittest2.TestCase):
     def _scenario_setup(self, foaf_uri1, foaf_uri2):
         data = self.sample_data % foaf_uri1
         backend = MemoryBackend(data=data)
-        origin1 = Origin.objects.create("http://example.org/sample1",
-                                                     BACKEND=backend)
+        origin1 = Origin.objects.create("http://example.org/sample1", BACKEND=backend)
         origin1.GET()
 
         data = self.sample_data % foaf_uri2
         backend = MemoryBackend(data=data)
-        origin2 = Origin.objects.create("http://example.org/sample2",
-                                                     BACKEND=backend)
+        origin2 = Origin.objects.create("http://example.org/sample2", BACKEND=backend)
         origin2.GET()
 
     def test_check_shortcut_consistency_does_not_complain(self):

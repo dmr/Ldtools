@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-import unittest2
+from unittest import TestCase
 
-import rdflib
+from rdflib import Literal, BNode, URIRef
 
 from ldtools.backends import MemoryBackend
 from ldtools.origin import Origin
@@ -39,13 +39,12 @@ DATA_XML = """
 """
 
 
-class ResourceManagerGetFilter(unittest2.TestCase):
+class ResourceManagerGetFilter(TestCase):
     def setUp(self):
         Origin.objects.reset_store()
         Resource.objects.reset_store()
         uri = "http://example.org/resource"
-        self.origin = Origin.objects.create(uri,
-                                            BACKEND=MemoryBackend())
+        self.origin = Origin.objects.create(uri, BACKEND=MemoryBackend())
         self.origin.GET()
 
     def test_manager_create_relative_fails(self):
@@ -55,7 +54,7 @@ class ResourceManagerGetFilter(unittest2.TestCase):
     def test_manager_create_absolute(self):
         url = self.origin.uri + "#me"
         resource = Resource.objects.create(url, origin=self.origin)
-        assert resource._uri == rdflib.URIRef(url)
+        assert resource._uri == URIRef(url)
         assert len(Resource.objects.all()) == 1
 
     def test_manager_get(self):
@@ -68,30 +67,34 @@ class ResourceManagerGetFilter(unittest2.TestCase):
     def test_manager_filter(self):
         uri = "http://example.com"
         resource = Resource.objects.create(uri, origin=self.origin)
-        resource2 = Resource.objects.create(uri+"/test",
-                                                    origin=self.origin)
+        resource2 = Resource.objects.create(uri+"/test", origin=self.origin)
         resource_filter = Resource.objects.filter(_origin=self.origin)
         self.assertIn(resource, resource_filter)
 
 
-class ResourceCreate(unittest2.TestCase):
+class ResourceCreate(TestCase):
     def test_create_1(self):
-        origin = Origin.objects.create(uri="http://example.org/",
-            BACKEND=MemoryBackend())
+        origin = Origin.objects.create(
+            uri="http://example.org/",
+            BACKEND=MemoryBackend()
+        )
         origin.GET()
-        resource = Resource.objects.create(origin=origin,
-            uri=rdflib.BNode())
+        resource = Resource.objects.create(
+            origin=origin,
+            uri=BNode()
+        )
 
-        self.assert_(isinstance(resource._uri, rdflib.BNode))
+        self.assert_(isinstance(resource._uri, BNode))
 
 
-class ResourceGetAuthoritative(unittest2.TestCase):
+class ResourceGetAuthoritative(TestCase):
     def setUp(self):
         Origin.objects.reset_store()
         Resource.objects.reset_store()
 
     def test_is_same_uri(self):
-        origin1 = Origin.objects.create(uri="http://example1.com/person1",
+        origin1 = Origin.objects.create(
+            uri="http://example1.com/person1",
             BACKEND=MemoryBackend("""
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 <person1> a foaf:Person;
@@ -125,7 +128,8 @@ class ResourceGetAuthoritative(unittest2.TestCase):
         self.assert_(origin2.processed)
 
     def test_blank_node_is_auth(self):
-        origin1 = Origin.objects.create(uri="http://example1.com/person1",
+        origin1 = Origin.objects.create(
+            uri="http://example1.com/person1",
             BACKEND=MemoryBackend("""
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 <person1> foaf:knows _:max.
@@ -138,34 +142,35 @@ _:max foaf:name "Max".""", format="n3"))
 
         resources = set(r1._origin.get_resources())
         resources.discard(r1)
-        assert len(list(resources)) == 1,list(resources)
+        assert len(list(resources)) == 1, list(resources)
         der_max = list(resources)[0]
 
         self.assert_(der_max.is_authoritative_resource())
 
 
-class ResourceSave(unittest2.TestCase):
+class ResourceSave(TestCase):
     def test_set_attribute(self):
         # set up
         Origin.objects.reset_store()
         Resource.objects.reset_store()
 
         uri = "http://example.org/foaf"
-        self.origin1 = Origin.objects.create(uri=uri,
-                             BACKEND=MemoryBackend(DATA_XML,))
+        self.origin1 = Origin.objects.create(
+            uri=uri,
+            BACKEND=MemoryBackend(DATA_XML,)
+        )
         self.origin1.GET()
 
         res = Resource.objects.get(uri)
         self.assert_(res.dc_title)
-        self.assertEqual(res.dc_title,
-             rdflib.Literal(u"Daniel Rech's FOAF file"))
+        self.assertEqual(res.dc_title, Literal(u"Daniel Rech's FOAF file"))
 
         # modify
-        res.dc_title = rdflib.Literal(u"TEST")
+        res.dc_title = Literal(u"TEST")
 
         # test
         self.assert_(res._has_changes)
-        self.assertEqual(res.dc_title, rdflib.Literal(u"TEST"))
+        self.assertEqual(res.dc_title, Literal(u"TEST"))
 
         # modify
         res.save()

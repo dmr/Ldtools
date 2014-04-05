@@ -1,10 +1,9 @@
 import copy
-import unittest2
+from unittest import TestCase
 from ldtools.cli import get_parser
-import argparse
 
 
-class ParserTestCase(unittest2.TestCase):
+class ParserTestCase(TestCase):
     def setUp(self):
         self.default_arguments_dict = dict(
             depth=0,
@@ -31,15 +30,18 @@ class ParserTestCase(unittest2.TestCase):
         )
 
     def test_arguments_verbosity(self):
-        self._check_equals("http://a.com --verbosity 1",
+        self._check_equals(
+            "http://a.com --verbosity 1",
             dict(verbosity=1, origin_urls=["http://a.com"]))
 
     def test_arguments_depth(self):
-        self._check_equals("http://a.com --depth 5",
+        self._check_equals(
+            "http://a.com --depth 5",
             dict(depth=5, origin_urls=["http://a.com"]))
 
     def test_urls_and_follow_uris(self):
-        self._check_equals("http://a.com "
+        self._check_equals(
+            "http://a.com "
             "--follow-uris http://rdfs.com/seeAlso1 "
             "--follow-uris http://rdfs.com/seeAlso2 ",
             dict(origin_urls=["http://a.com"],

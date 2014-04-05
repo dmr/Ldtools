@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
-import unittest2
-
+from unittest import TestCase
 from ldtools.backends import get_file_extension, RestBackend, MemoryBackend,\
     FileBackend
 
@@ -10,7 +9,6 @@ class StandardBackendReturnsRdflibGraphTestMixin(object):
     """Basis to assure we can use local resources in all other tests.
     Tests which functions the backend offers"""
     def test_GET(self):
-
         uri = "http://xmlns.com/foaf/0.1/"
         data = self.BACKEND.GET(uri)
 
@@ -40,8 +38,7 @@ class StandardBackendReturnsRdflibGraphTestMixin(object):
     # TODO: that to check?
 
 
-class FileBackendTestCase(unittest2.TestCase,
-                          StandardBackendReturnsRdflibGraphTestMixin):
+class FileBackendTestCase(TestCase, StandardBackendReturnsRdflibGraphTestMixin):
     def setUp(self):
         filename = "www_w3_org__People__Berners-Lee__card.xml"
         file_name = os.path.join(os.path.dirname(__file__), filename)
@@ -50,16 +47,14 @@ class FileBackendTestCase(unittest2.TestCase,
         # TODO implement file object handling, maybe use
         # tempfile.NamedTemporaryFile instead of file
 
-
     def tearDown(self):
         self.BACKEND.revert_to_old_version()
 
     def test_revert_to_old_version(self):
-        pass # TODO
+        pass  # TODO
 
 
-class MemoryBackendTestCase(unittest2.TestCase,
-                          StandardBackendReturnsRdflibGraphTestMixin):
+class MemoryBackendTestCase(TestCase, StandardBackendReturnsRdflibGraphTestMixin):
     def setUp(self):
         filename = "www_w3_org__People__Berners-Lee__card.xml"
         file_name = os.path.join(os.path.dirname(__file__), filename)
@@ -68,7 +63,7 @@ class MemoryBackendTestCase(unittest2.TestCase,
         self.BACKEND = MemoryBackend(data)
 
 
-class GetFileExtensionTestCase(unittest2.TestCase):
+class GetFileExtensionTestCase(TestCase):
     def test_get_file_extension(self):
         for file_name, extension in [
             ("test.xml", "xml"),
@@ -79,7 +74,7 @@ class GetFileExtensionTestCase(unittest2.TestCase):
             self.assertEqual(get_file_extension(file_name), extension)
 
 
-class RestBackendTestCase(unittest2.TestCase):
+class RestBackendTestCase(TestCase):
 
     def setUp(self):
         self.BACKEND = RestBackend()
@@ -87,19 +82,20 @@ class RestBackendTestCase(unittest2.TestCase):
     def test_GET_n3(self):
         uri = "http://dbpedia.org/resource/Karlsruhe"
 
-        data = self.BACKEND.GET(uri, extra_headers={'Accept':('text/n3,')})
+        data = self.BACKEND.GET(uri, extra_headers={'Accept': ('text/n3,')})
         self.assertEqual(self.BACKEND.format, "n3")
 
-        self.assert_(data.startswith("@prefix"))
+        self.assert_(data.startswith(b"@prefix"))
 
     def test_GET_xml(self):
         uri = "http://dbpedia.org/resource/Karlsruhe"
 
         # might fail in dbpedia.org doesn't want to answer
-        data = self.BACKEND.GET(uri,
+        data = self.BACKEND.GET(
+            uri,
             # will replace Accept headers
-            extra_headers={'Accept':('application/rdf+xml')})
+            extra_headers={'Accept': ('application/rdf+xml')})
         self.assertEqual(self.BACKEND.format, "xml")
 
-        self.assert_(data.startswith("<?xml "))
-        self.assert_("<rdf" in data)
+        self.assert_(data.startswith(b"<?xml "))
+        self.assert_(b"<rdf" in data)

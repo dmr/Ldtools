@@ -1,25 +1,24 @@
 # -*- coding: utf-8 -*-
-import copy
-import unittest2
+from unittest import TestCase
 import rdflib
 from ldtools import models
 
 
-class ModelInit1TestCase(unittest2.TestCase):
+class ModelInit1TestCase(TestCase):
     def test_init_creates_pk(self):
         class TestModel(models.Model): pass
         self.assertIn('pk', TestModel().__dict__.keys())
 
 
-class ModelURIRefFieldTestCase(unittest2.TestCase):
+class ModelURIRefFieldTestCase(TestCase):
     def test_init_requires_uriref(self):
         class TestModel(models.Model):
             uri = models.URIRefField()
         self.assertIn('pk', TestModel(uri=rdflib.URIRef("test")).__dict__)
         self.assertRaises(ValueError, TestModel, uri="test")
-        
 
-class ManagerCreateTestCase(unittest2.TestCase):
+
+class ManagerCreateTestCase(TestCase):
     def test_create(self):
         class Sample3(models.Model):
             attr1 = models.StringField()
@@ -34,9 +33,10 @@ class Sample3(models.Model):
     objects = models.Manager()
 
 
-class ManagerFilterTestCase(unittest2.TestCase):
+class ManagerFilterTestCase(TestCase):
     def setUp(self):
         Sample3.objects.reset_store()
+
     def test_filter1(self):
         pk = attr1 = u"tü"
         o = Sample3.objects.create(pk=pk, attr1=attr1)
@@ -60,7 +60,7 @@ class ManagerFilterTestCase(unittest2.TestCase):
         self.assertEqual(len(filter_result), 0)
         self.assertEqual(filter_result, [])
 
-    def test_filter3(self):
+    def test_filter4(self):
         o1, o2, o3 = self._create_objects(u"a", u"b", u"c")
 
         self.assertEqual(len(Sample3.objects.all()), 3)
@@ -85,7 +85,7 @@ class ManagerFilterTestCase(unittest2.TestCase):
 
     def test_filter_allows_filtering_runtime_parameters1(self):
         o1, o2 = self._create_objects(u"a", u"b")
-        o1.processed=True
+        o1.processed = True
 
         filter_result = list(Sample3.objects.filter(processed=True))
         self.assertEqual(len(filter_result), 1)
@@ -94,8 +94,8 @@ class ManagerFilterTestCase(unittest2.TestCase):
 
     def test_filter_allows_filtering_runtime_parameters2(self):
         o1, o2, o3 = self._create_objects(u"a", u"b", u"c")
-        o1.processed=True
-        o3.processed=True
+        o1.processed = True
+        o3.processed = True
 
         filter_result = list(Sample3.objects.filter(processed=True))
         self.assertEqual(len(filter_result), 2)
@@ -104,7 +104,7 @@ class ManagerFilterTestCase(unittest2.TestCase):
         self.assertNotIn(o2, filter_result)
 
 
-class ModelFilterAndSetattrTestCase(unittest2.TestCase):
+class ModelFilterAndSetattrTestCase(TestCase):
     def setUp(self):
         Sample3.objects.reset_store()
 

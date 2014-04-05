@@ -1,19 +1,17 @@
+from unittest import TestCase
 from ldtools.backends import MemoryBackend
 from ldtools.helpers import my_graph_diff
-import unittest2
 import rdflib
 
 from ldtools.origin import Origin, GraphHandler
 from ldtools.resource import Resource
 
 
-cnt = lambda: (len(Origin.objects.all()),
-               len(Resource.objects.all()))
+cnt = lambda: (len(Origin.objects.all()), len(Resource.objects.all()))
 
 
 class GraphHandlerTestCase(object):
     def test_origin_GET_0_data_and_graph_rdflib(self):
-
         self._setUpScenario()
 
         # TODO: make this modular and testable
@@ -21,9 +19,7 @@ class GraphHandlerTestCase(object):
         data = self.origin.backend.GET(self.origin.uri)
         graph = rdflib.graph.ConjunctiveGraph(identifier=self.origin.uri)
         assert data
-        graph.parse(data=data,
-                        publicID=self.origin.uri,
-                        format=self.origin.backend.format)
+        graph.parse(data=data, publicID=self.origin.uri, format=self.origin.backend.format)
 
         assert len(list(graph.contexts())) == 1
         self.origin.processed = True
@@ -54,10 +50,10 @@ class Scenario1TestMixin(object):
         self.origin = Origin.objects.create(uri=uri, BACKEND=BACKEND)
 
 
-class GraphHandlerScenario1TestCase(Scenario1TestMixin, GraphHandlerTestCase,
-                                    unittest2.TestCase):
+class GraphHandlerScenario1TestCase(Scenario1TestMixin, GraphHandlerTestCase, TestCase):
     def setUp(self):
-        self.kw = dict(only_follow_uris=None, handle_owl_imports=False,)
+        self.kw = dict(only_follow_uris=None, handle_owl_imports=False)
+
     def assure_results(self, graph):
         self.assertEqual(cnt(), (2, 2))
         self.assertEqual(len(graph), 2)
@@ -87,22 +83,22 @@ class Scenario2TestMixin(object):
         self.origin = Origin.objects.create(uri=uri, BACKEND=BACKEND)
 
 
-class GraphHandlerScenario2TestCase(Scenario2TestMixin, GraphHandlerTestCase,
-                                    unittest2.TestCase):
+class GraphHandlerScenario2TestCase(Scenario2TestMixin, GraphHandlerTestCase, TestCase):
     def setUp(self):
-        self.kw = dict(only_follow_uris=None, handle_owl_imports=False,)
+        self.kw = dict(only_follow_uris=None, handle_owl_imports=False)
+
     def assure_results(self, graph):
         self.assertEqual(cnt(), (3, 3))
         self.assertEqual(len(graph), 2)
         self.assert_(not my_graph_diff(graph, self.origin.get_graph()))
 
 
-class GraphHandlerScenario2TestCaseOnlyFollowUrisMiss(Scenario2TestMixin, GraphHandlerTestCase,
-                                    unittest2.TestCase):
+class GraphHandlerScenario2TestCaseOnlyFollowUrisMiss(Scenario2TestMixin, GraphHandlerTestCase, TestCase):
     def setUp(self):
         self.kw = dict(only_follow_uris=[
             "http://example.com/property"],
                        handle_owl_imports=False,)
+
     def assure_results(self, graph):
         self.assertEqual(cnt(), (1, 3))
 
@@ -110,12 +106,11 @@ class GraphHandlerScenario2TestCaseOnlyFollowUrisMiss(Scenario2TestMixin, GraphH
         self.assert_(not my_graph_diff(graph, self.origin.get_graph()))
 
 
-class GraphHandlerScenario2TestCaseOnlyFollowUrisHit(Scenario2TestMixin, GraphHandlerTestCase,
-                                    unittest2.TestCase):
+class GraphHandlerScenario2TestCaseOnlyFollowUrisHit(Scenario2TestMixin, GraphHandlerTestCase, TestCase):
     def setUp(self):
-        self.kw = dict(only_follow_uris=[
-            "http://example.com/myvoc#device"],
-                       handle_owl_imports=False,)
+        self.kw = dict(
+            only_follow_uris=["http://example.com/myvoc#device"], handle_owl_imports=False)
+
     def assure_results(self, graph):
         self.assertEqual(cnt(), (2, 3))
 
@@ -128,13 +123,14 @@ class Scenario3TestMixin(object):
         Resource.objects.reset_store()
         Origin.objects.reset_store()
 
-        baseuri =  "http://example.com/%s"
+        baseuri = "http://example.com/%s"
 
         # create "friends" origin before the other one.
         # This is a trick to avoid doing requests to real uris.
         # (Usually origin.objects.get_or_create would choose RestBackend...)
         # will be processed during "handle_owl_imports=True"
-        self.origin2 = Origin.objects.create(uri=baseuri % "friends",
+        self.origin2 = Origin.objects.create(
+            uri=baseuri % "friends",
             BACKEND=MemoryBackend(data='''@prefix foaf: <http://xmlns.com/foaf/0.1/> .
 <dieter> a foaf:Person;
     foaf:name "Dieter".
@@ -155,8 +151,8 @@ class Scenario3TestMixin(object):
         <foaf:name>Max Mustermann</foaf:name>
     </foaf:Person></rdf:RDF>'''))
 
-class GraphHandlerScenario3TestCase(Scenario3TestMixin, GraphHandlerTestCase,
-                                    unittest2.TestCase):
+
+class GraphHandlerScenario3TestCase(Scenario3TestMixin, GraphHandlerTestCase, TestCase):
     def setUp(self):
         self.kw = dict(only_follow_uris=None, handle_owl_imports=False)
     def assure_results(self, graph):
@@ -166,8 +162,8 @@ class GraphHandlerScenario3TestCase(Scenario3TestMixin, GraphHandlerTestCase,
         self.assert_(not my_graph_diff(graph, self.origin.get_graph()))
         self.assert_(not self.origin2.processed)
 
-class GraphHandlerScenario3TestCaseOwlImports(Scenario3TestMixin, GraphHandlerTestCase,
-                                    unittest2.TestCase):
+
+class GraphHandlerScenario3TestCaseOwlImports(Scenario3TestMixin, GraphHandlerTestCase, TestCase):
     def setUp(self):
         self.kw = dict(only_follow_uris=None, handle_owl_imports=True)
     def assure_results(self, graph):
