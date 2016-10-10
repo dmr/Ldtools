@@ -12,22 +12,24 @@ from rdflib import compare
 
 logger = logging.getLogger("ldtools")
 
+RESET_SEQ = "\033[0m"
+COLOR_SEQ = "\033[1;%dm"
+BOLD_SEQ = "\033[1m"
+# The background is set with 40 plus the number of the color, and
+# the foreground with 30
+# These are the sequences need to get colored ouput
+BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
+COL = {
+    'DEBUG': BLUE, 'INFO': MAGENTA,
+    'WARNING': YELLOW, 'CRITICAL': YELLOW, 'ERROR': RED}
+
 
 def set_colored_logger(verbosity_level):
     class ColoredFormatter(logging.Formatter):
         def format(self, record):
-            BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
-            #The background is set with 40 plus the number of the color, and
-            # the foreground with 30
-            #These are the sequences need to get colored ouput
-            RESET_SEQ = "\033[0m"
-            COLOR_SEQ = "\033[1;%dm"
-            BOLD_SEQ = "\033[1m"
-            COLORS = {'DEBUG': BLUE,'INFO': MAGENTA,
-                'WARNING': YELLOW,'CRITICAL': YELLOW,'ERROR': RED}
-            if record.levelname in COLORS:
-                record.levelname = COLOR_SEQ % (30 + COLORS[record.levelname]) + \
-                                  record.levelname + RESET_SEQ
+            if record.levelname in COL:
+                record.levelname = COLOR_SEQ % (
+                    30 + COL[record.levelname]) + record.levelname + RESET_SEQ
             record.msg = unicode(record.msg)
             record.msg = COLOR_SEQ % (30 + GREEN) + record.msg + RESET_SEQ
             return logging.Formatter.format(self, record)

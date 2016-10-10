@@ -7,7 +7,12 @@ import sys
 
 import argparse
 
-from ldtools.utils import is_valid_url, get_slash_url, get_rdflib_uriref, urllib2
+from ldtools.utils import (
+    is_valid_url,
+    get_slash_url,
+    get_rdflib_uriref,
+    urllib2,
+)
 from ldtools.helpers import set_colored_logger
 from ldtools.backends import __version__
 from ldtools.origin import Origin
@@ -18,17 +23,13 @@ logger = logging.getLogger("ldtools.cli")
 
 def get_parser():
     parser = argparse.ArgumentParser()
-
-    version_str = '%(prog)s ' + __version__
     parser.add_argument(
-        '--version', action='version', version=version_str,
+        '--version', action='version', version='%(prog)s ' + __version__,
         help="Print current version")
-
     parser.add_argument(
         '-v', '--verbosity', action="store",
         help='Adjust verbosity. 1 for every detail, 5 for silent',
         default=2, type=int)
-
     parser.add_argument(
         '-d', '--depth', action="store", default=0, type=int,
         help="Crawl discovered Origins x times")
@@ -46,29 +47,21 @@ def get_parser():
     print_group.add_argument(
         '--only-print-uris', action="store_true",
         help='Only prints a short representation of Resources')
-    print_group.add_argument(
-        '--print-detailed-resources-limit',
-        action="store",
-        help=('If more resources are discovered, only short representations '
-              'will be printed'),
-        default=300, type=int)
 
     parser.add_argument(
         '--only-print-uri-content', action="store_true",
         help='Only prints data retrieved from URIs and exists')
-
     parser.add_argument(
         '--socket-timeout', action="store", type=int,
         help="Set the socket timeout")
-
     parser.add_argument(
         '-o', '--only-negotiate', action="store_true",
         help='Only do content negotiation for given URIs and print the '
              'response headers')
-
     parser.add_argument(
         '--GRAPH_SIZE_LIMIT', action="store", type=int,
         help="Set maximum graph size that will be processed")
+    parser.add_argument('--print-all-resources', action="store_true")
 
     def check_uri(url):
         if not is_valid_url(url):
@@ -77,31 +70,22 @@ def get_parser():
     parser.add_argument(
         'origin_urls', action="store", nargs='+', type=check_uri,
         help="Pass a list of URIs. ldtools will crawl them one by one")
-
-    parser.add_argument('--print-all-resources', action="store_true")
-
     return parser
 
 
 def execute_ldtools(
-        verbosity,
-        origin_urls,
-        depth,
-
-        follow_all,
-        follow_uris,
-        socket_timeout,
-        GRAPH_SIZE_LIMIT,
-
-        print_all_resources,
-        print_detailed_resources_limit,
-        only_print_uris,
-
-        only_print_uri_content,
-
-        only_negotiate
-
-        ):
+    verbosity,
+    origin_urls,
+    depth,
+    follow_all,
+    follow_uris,
+    socket_timeout,
+    GRAPH_SIZE_LIMIT,
+    print_all_resources,
+    only_print_uris,
+    only_print_uri_content,
+    only_negotiate
+):
     set_colored_logger(verbosity)
 
     # customize Origin.objects.post_create_hook for performance reasons
@@ -165,8 +149,8 @@ def execute_ldtools(
         origin = Origin.objects.get(url)
         for r in origin.get_resources():
             if r._uri == get_rdflib_uriref(orig_url):
-                logger.info(
-                    u"Printing all available information about {0}".format(r._uri))
+                logger.info(u"Printing all available information "
+                    "about {0}".format(r._uri))
                 if hasattr(r, "_has_changes"):
                     delattr(r, "_has_changes")
                 if hasattr(r, "pk"):
@@ -175,12 +159,7 @@ def execute_ldtools(
 
     if print_all_resources:
         all_resources = Resource.objects.all()
-        if (len(all_resources) > print_detailed_resources_limit or only_print_uris):
-            logger.warning(
-                "ldtools discovered more than %s Resource objects, "
-                "only printing titles of the %s Resources discovered"
-                % (print_detailed_resources_limit, len(all_resources))
-            )
+        if (only_print_uris):
             for resource in all_resources:
                 print(resource)
         else:

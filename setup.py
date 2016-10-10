@@ -15,10 +15,7 @@ setup(
     author_email=author_email,
     description='A lightweight ORM for Linked Data: Consume Linked Data resources, modify the graph and write the changes back to their original source',
     long_description=README,
-
     packages=["ldtools"],
-    #packages=find_packages(),
-
     entry_points={
         'console_scripts': [
             'ldtools = ldtools.cli:main'
@@ -48,6 +45,7 @@ setup(
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
         'License :: OSI Approved :: BSD License',
     ],
 )

@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from unittest import TestCase
 import copy
-from ldtools import models
+from ldtools.metamodels import Model, Manager
+from ldtools.models import StringField
 
 
 class Myobject(object):
@@ -67,9 +68,9 @@ class HashAndEqTest(TestCase):
 
 class ModelEqualityAndHashFunctionTestCase(TestCase):
     def _create_objects(self, *objects):
-        class SampleEquality(models.Model):
-            attr1 = models.StringField()
-            objects = models.Manager()
+        class SampleEquality(Model):
+            attr1 = StringField()
+            objects = Manager()
         obj_list = []
         for obj in objects:
             obj_list.append(SampleEquality.objects.create(**obj))
@@ -98,10 +99,10 @@ class ModelEqualityAndHashFunctionTestCase(TestCase):
         self.assertNotEqual(o1, o2)
         # TODO: __hash__ should make the following statement true but it doesnt
         # test_set = set()
-        #test_set.add(o1)
-        #test_set.add(o2)
-        #self.assertEqual(o1.pk, o2.pk)
-        #self.assertEqual(len(test_set), 1)
+        # test_set.add(o1)
+        # test_set.add(o2)
+        # self.assertEqual(o1.pk, o2.pk)
+        # self.assertEqual(len(test_set), 1)
 
     def test_are_not_equal_3(self):
         o1, o2 = self._create_objects(dict(pk=1, attr1="test1"),
@@ -119,6 +120,6 @@ class ModelEqualityAndHashFunctionTestCase(TestCase):
     def test_hash2(self):
         o1, o2 = self._create_objects(dict(pk=1, attr1="test1"),
                                       dict(pk=2, attr1="test1"))
-        o2.pk=1
+        o2.pk = 1
         sett = set([o1, o2])
         self.assertEquals(len(sett), 1)

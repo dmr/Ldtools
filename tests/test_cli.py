@@ -10,7 +10,6 @@ class ParserTestCase(TestCase):
             follow_all=False,
             follow_uris=[],
             only_print_uris=False,
-            print_detailed_resources_limit=300,
             origin_urls=[],
             verbosity=2,
             socket_timeout=None,

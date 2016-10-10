@@ -1,36 +1,38 @@
 # -*- coding: utf-8 -*-
 from unittest import TestCase
 import rdflib
-from ldtools import models
+from ldtools.metamodels import Model, Manager
+from ldtools.models import URIRefField, StringField
 
 
 class ModelInit1TestCase(TestCase):
     def test_init_creates_pk(self):
-        class TestModel(models.Model): pass
+        class TestModel(Model):
+            pass
         self.assertIn('pk', TestModel().__dict__.keys())
 
 
 class ModelURIRefFieldTestCase(TestCase):
     def test_init_requires_uriref(self):
-        class TestModel(models.Model):
-            uri = models.URIRefField()
+        class TestModel(Model):
+            uri = URIRefField()
         self.assertIn('pk', TestModel(uri=rdflib.URIRef("test")).__dict__)
         self.assertRaises(ValueError, TestModel, uri="test")
 
 
 class ManagerCreateTestCase(TestCase):
     def test_create(self):
-        class Sample3(models.Model):
-            attr1 = models.StringField()
-            objects = models.Manager()
+        class Sample3(Model):
+            attr1 = StringField()
+            objects = Manager()
         pk = attr1 = u"tü"
         self.o = Sample3.objects.create(pk=pk, attr1=attr1)
         assert self.o in Sample3.objects.all()
 
 
-class Sample3(models.Model):
-    attr1 = models.StringField()
-    objects = models.Manager()
+class Sample3(Model):
+    attr1 = StringField()
+    objects = Manager()
 
 
 class ManagerFilterTestCase(TestCase):
@@ -113,25 +115,24 @@ class ModelFilterAndSetattrTestCase(TestCase):
         o1.another_attr = "ttest"
         o2 = Sample3.objects.create(pk=2)
         o2.another_attr = "ttes"
-
-        self.assertEqual(len(list(Sample3.objects.filter(another_attr="ttest"))), 1)
+        self.assertEqual(len(list(
+            Sample3.objects.filter(another_attr="ttest"))), 1)
 
     def test_filter_set(self):
         o1 = Sample3.objects.create(pk=1)
         o1.another_attr = set(["ttest", "test2"])
         o2 = Sample3.objects.create(pk=2)
         o2.another_attr = "test"
-
-        self.assertEqual(len(list(Sample3.objects.filter(another_attr="test2"))), 1)
+        self.assertEqual(len(list(
+            Sample3.objects.filter(another_attr="test2"))), 1)
 
     def test_filter_model(self):
         o1 = Sample3.objects.create(pk=1)
         o2 = Sample3.objects.create(pk=2)
         o2.another_attr = o1
         o3 = Sample3.objects.create(pk=3)
-
         self.assertIn(o2, Sample3.objects.filter(another_attr=o1))
-        self.assertEqual(len(list(Sample3.objects.filter(another_attr=o1))),1)
+        self.assertEqual(len(list(Sample3.objects.filter(another_attr=o1))), 1)
 
     def test_filter_model_set(self):
         o1 = Sample3.objects.create(pk=1)
@@ -139,14 +140,13 @@ class ModelFilterAndSetattrTestCase(TestCase):
         o3 = Sample3.objects.create(pk=3)
         o2.another_attr = o1
         o4 = Sample3.objects.create(pk=4)
-
         self.assertIn(o2, Sample3.objects.filter(another_attr=o1))
-        self.assertEqual(len(list(Sample3.objects.filter(another_attr=o1))),1)
+        self.assertEqual(len(list(Sample3.objects.filter(another_attr=o1))), 1)
 
     def test_filter_list(self):
         o1 = Sample3.objects.create(pk=1)
         o1.another_attr = ["ttest", "test2"]
         o2 = Sample3.objects.create(pk=2)
         o2.another_attr = "test"
-
-        self.assertEqual(len(list(Sample3.objects.filter(another_attr="test2"))), 1)
+        self.assertEqual(len(list(
+            Sample3.objects.filter(another_attr="test2"))), 1)

@@ -18,7 +18,8 @@ class TestUrlparse(TestCase):
     def test_hash3(self):
         uri = "http://www.cwi.nl:80/%7Eguido/Python.html#bla"
         r = urlparse.urlsplit(uri)
-        self.assertEqual(r.geturl(), "http://www.cwi.nl:80/%7Eguido/Python.html#bla")
+        self.assertEqual(
+            r.geturl(), "http://www.cwi.nl:80/%7Eguido/Python.html#bla")
 
 
 class TestRdflibLiterals(TestCase):

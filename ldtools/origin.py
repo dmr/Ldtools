@@ -10,13 +10,13 @@ import datetime
 import rdflib
 from xml.sax._exceptions import SAXParseException
 import logging
-logger = logging.getLogger(__name__)
 
 from rdflib import compare
 
 from ldtools.backends import RestBackend, ContentNegotiationError
 from ldtools.resource import Resource
-from ldtools.models import Manager, Model, URIRefField, ObjectField
+from ldtools.metamodels import Manager, Model
+from ldtools.models import URIRefField, ObjectField
 from ldtools.utils import (
     get_rdflib_uriref, get_slash_url,
     catchKeyboardInterrupt, is_valid_url, reverse_dict, safe_dict,
@@ -24,6 +24,8 @@ from ldtools.utils import (
     urllib2
 )
 from ldtools.helpers import my_graph_diff
+
+logger = logging.getLogger(__name__)
 
 
 class OriginManager(Manager):
@@ -153,11 +155,12 @@ class Origin(Model):
                                "processing the resource's origin.")
 
         now = datetime.datetime.now()
-        #self.timedelta = datetime.timedelta(minutes=1)
+        # self.timedelta = datetime.timedelta(minutes=1)
         if hasattr(self, "timedelta") and hasattr(self, 'last_processed'):
             time_since_last_processed = now - self.last_processed
             if (time_since_last_processed < self.timedelta):
-                logger.info("Not processing %s again because was processed only %s ago" % (self.uri, time_since_last_processed))
+                logger.info(
+                    "Not processing %s again because was processed only %s ago" % (self.uri, time_since_last_processed))
                 return
             self.last_processed = now
 
@@ -340,7 +343,9 @@ class Origin(Model):
         # objects with changed attributes exist
         if any(
             resource._has_changes
-            for resource in self.get_resources() if (hasattr(resource, '_has_changes') and resource._has_changes is True)
+            for resource in self.get_resources()
+            if (hasattr(resource, '_has_changes') and
+                resource._has_changes is True)
         ):
             return True
         return False
@@ -406,7 +411,6 @@ class GraphHandler(object):
 
             if self.handle_owl_imports:
                 if (predicate == rdflib.OWL.imports and type(obj_ect) == rdflib.URIRef):
-
                     uri = get_slash_url(obj_ect)
                     origin, created = Origin.objects.get_or_create(uri=uri)
 
@@ -414,8 +418,9 @@ class GraphHandler(object):
                                 "first" % (origin.uri))
                     origin.GET()
 
-            if ((self.only_follow_uris is not None and predicate in self.only_follow_uris) or self.only_follow_uris is None):
-
+            if ((
+                self.only_follow_uris is not None and predicate in self.only_follow_uris
+            ) or self.only_follow_uris is None):
                 if type(obj_ect) == rdflib.URIRef:
                     # wrong scheme mailto, tel, callto --> should be Literal?
                     if is_valid_url(obj_ect):

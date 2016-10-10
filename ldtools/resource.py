@@ -1,16 +1,17 @@
 # -*- coding: utf-8 -*-
 import logging
-logger = logging.getLogger(__name__)
-
 import rdflib
 
-from ldtools.models import Manager, Model, URIRefField, ObjectField
+from ldtools.metamodels import Manager, Model
+from ldtools.models import URIRefField, ObjectField
 from ldtools.utils import (
     get_rdflib_uriref,
     get_slash_url,
     predicate2pyattr,
     urlparse
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ResourceManager(Manager):
@@ -19,8 +20,8 @@ class ResourceManager(Manager):
 
     def create(self, uri, origin, **kwargs):
 
-        #from ldtools.origin import Origin <-- import circle problem
-        #assert isinstance(origin, Origin), "Origin instance required"
+        # from ldtools.origin import Origin <-- import circle problem
+        # assert isinstance(origin, Origin), "Origin instance required"
         assert origin is not None
         assert origin.processed, ("Origin has to be processed before creating more Resource objects: origin.GET()")
 
@@ -114,10 +115,12 @@ class Resource(Model):
                     logger.debug("Not a Resource URI because not valid: %s "
                                  "--> should be rdflib.Literals?" % obj)
 
-        predicate = predicate2pyattr(predicate, namespace_short_notation_reverse_dict)
+        predicate = predicate2pyattr(
+            predicate, namespace_short_notation_reverse_dict)
 
         if is_resource:
-            logger.debug("%s . %s = Resource( %s )" % (self._uri, predicate, obj))
+            logger.debug(
+                "%s . %s = Resource( %s )" % (self._uri, predicate, obj))
             obj, _created = Resource.objects.get_or_create(
                 uri=obj, origin=self._origin)
 
@@ -165,10 +168,11 @@ class Resource(Model):
     def save(self):
         created = not self.pk
         if created:
-            assert 0, ("Please use Resource.objects.create() to create "
-                       "Resource objects!")
+            raise AssertionError(
+                "Please use Resource.objects.create() to create "
+                "Resource objects!")
         assert self in Resource.objects.filter(_origin=self._origin)
-        #defined_values = dict((name, getattr(self, name)) for name in
+        # defined_values = dict((name, getattr(self, name)) for name in
         # self._meta.fields.iterkeys())
         self.update()  # **values)
 

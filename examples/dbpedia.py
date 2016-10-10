@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
-import pprint
-
 import rdflib
 
 from ldtools.origin import Origin

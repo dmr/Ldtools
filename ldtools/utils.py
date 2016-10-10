@@ -12,17 +12,18 @@ try:
 except:
     import urllib.request as urllib2  # used in other modules
 
-import logging
-logger = logging.getLogger(__name__)
-
 import rdflib
 from rdflib.namespace import split_uri
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def get_parsed_uri(uri, scheme_check=False):
     parsed = urlparse.urlparse(uri)
     if scheme_check:
-        if not parsed.scheme in ["http", "https"]:
+        if parsed.scheme not in ["http", "https"]:
             raise ValueError(
                 "Not a URL. scheme is not http(s): %s" % parsed.scheme
             )
@@ -46,7 +47,7 @@ def is_valid_url(uri):
         return False
     # TODO: implement canonalization of URI. Problem: graph comparison not
     # trivial
-    if not "http" in uri:
+    if "http" not in uri:
         return False
     return True
 
@@ -131,10 +132,10 @@ def predicate2pyattr(predicate, namespace_short_notation_reverse_dict):
     assert propertyname
 
     # print ('predicate2pyattr', predicate, '-->', prefix, propertyname)
-    #if not "_" in propertyname:
+    # if not "_" in propertyname:
     #    logger.info("%s_%s may cause problems?" % (prefix, propertyname))
 
-    if not prefix in namespace_short_notation_reverse_dict:
+    if prefix not in namespace_short_notation_reverse_dict:
         logger.warning("%s cannot be shortened" % predicate)
         return predicate
 
@@ -173,7 +174,7 @@ def pyattr2predicate(pyattr, namespace_dict):
 
     # i.e.: foaf defined as "" --> manually handle 'mbox_sha1sum'
     if "" in namespace_dict:
-        if not prefix in namespace_dict:
+        if prefix not in namespace_dict:
             logger.error("problem. %s, %s" % (prefix, pyattr))
             return rdflib.URIRef(u"%s%s" % (namespace_dict[""], pyattr))
     else:

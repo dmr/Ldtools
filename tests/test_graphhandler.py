@@ -7,7 +7,7 @@ from ldtools.origin import Origin, GraphHandler
 from ldtools.resource import Resource
 
 
-cnt = lambda: (len(Origin.objects.all()), len(Resource.objects.all()))
+count = lambda: (len(Origin.objects.all()), len(Resource.objects.all()))
 
 
 class GraphHandlerTestCase(object):
@@ -19,7 +19,10 @@ class GraphHandlerTestCase(object):
         data = self.origin.backend.GET(self.origin.uri)
         graph = rdflib.graph.ConjunctiveGraph(identifier=self.origin.uri)
         assert data
-        graph.parse(data=data, publicID=self.origin.uri, format=self.origin.backend.format)
+        graph.parse(
+            data=data,
+            publicID=self.origin.uri,
+            format=self.origin.backend.format)
 
         assert len(list(graph.contexts())) == 1
         self.origin.processed = True
@@ -55,7 +58,7 @@ class GraphHandlerScenario1TestCase(Scenario1TestMixin, GraphHandlerTestCase, Te
         self.kw = dict(only_follow_uris=None, handle_owl_imports=False)
 
     def assure_results(self, graph):
-        self.assertEqual(cnt(), (2, 2))
+        self.assertEqual(count(), (2, 2))
         self.assertEqual(len(graph), 2)
         self.assertIn((rdflib.term.URIRef('http://example.com/foaf#me'),
                        rdflib.term.URIRef('http://xmlns.com/foaf/0.1/name'),
@@ -88,7 +91,7 @@ class GraphHandlerScenario2TestCase(Scenario2TestMixin, GraphHandlerTestCase, Te
         self.kw = dict(only_follow_uris=None, handle_owl_imports=False)
 
     def assure_results(self, graph):
-        self.assertEqual(cnt(), (3, 3))
+        self.assertEqual(count(), (3, 3))
         self.assertEqual(len(graph), 2)
         self.assert_(not my_graph_diff(graph, self.origin.get_graph()))
 
@@ -100,7 +103,7 @@ class GraphHandlerScenario2TestCaseOnlyFollowUrisMiss(Scenario2TestMixin, GraphH
                        handle_owl_imports=False,)
 
     def assure_results(self, graph):
-        self.assertEqual(cnt(), (1, 3))
+        self.assertEqual(count(), (1, 3))
 
         self.assertEqual(len(graph), 2)
         self.assert_(not my_graph_diff(graph, self.origin.get_graph()))
@@ -112,7 +115,7 @@ class GraphHandlerScenario2TestCaseOnlyFollowUrisHit(Scenario2TestMixin, GraphHa
             only_follow_uris=["http://example.com/myvoc#device"], handle_owl_imports=False)
 
     def assure_results(self, graph):
-        self.assertEqual(cnt(), (2, 3))
+        self.assertEqual(count(), (2, 3))
 
         self.assertEqual(len(graph), 2)
         self.assert_(not my_graph_diff(graph, self.origin.get_graph()))
@@ -155,8 +158,9 @@ class Scenario3TestMixin(object):
 class GraphHandlerScenario3TestCase(Scenario3TestMixin, GraphHandlerTestCase, TestCase):
     def setUp(self):
         self.kw = dict(only_follow_uris=None, handle_owl_imports=False)
+
     def assure_results(self, graph):
-        self.assertEqual(cnt(), (4, 5))
+        self.assertEqual(count(), (4, 5))
         self.assertEqual(len(graph), 5)
         # assert graph == get_graph()
         self.assert_(not my_graph_diff(graph, self.origin.get_graph()))
@@ -166,8 +170,9 @@ class GraphHandlerScenario3TestCase(Scenario3TestMixin, GraphHandlerTestCase, Te
 class GraphHandlerScenario3TestCaseOwlImports(Scenario3TestMixin, GraphHandlerTestCase, TestCase):
     def setUp(self):
         self.kw = dict(only_follow_uris=None, handle_owl_imports=True)
+
     def assure_results(self, graph):
-        self.assertEqual(cnt(), (5, 8))
+        self.assertEqual(count(), (5, 8))
         self.assertEqual(len(graph), 5)
         # assert graph == get_graph()
         self.assert_(not my_graph_diff(graph, self.origin.get_graph()))
